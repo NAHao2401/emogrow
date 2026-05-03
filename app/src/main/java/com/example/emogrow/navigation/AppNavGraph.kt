@@ -15,16 +15,21 @@ import com.example.emogrow.features.children.ui.CreateChildScreen
 import com.example.emogrow.features.children.viewmodel.ChildViewModel
 import com.example.emogrow.features.children.viewmodel.ChildViewModelFactory
 import com.example.emogrow.features.home.ui.HomeScreen
+import com.example.emogrow.features.journal.ui.JournalScreen
+import com.example.emogrow.features.journal.viewmodel.JournalViewModel
+import com.example.emogrow.features.journal.viewmodel.JournalViewModelFactory
 
 @Composable
 fun AppNavGraph(
     authFactory: AuthViewModelFactory,
-    childFactory: ChildViewModelFactory
+    childFactory: ChildViewModelFactory,
+    journalFactory: JournalViewModelFactory
 ) {
     val navController = rememberNavController()
 
     val authViewModel: AuthViewModel = viewModel(factory = authFactory)
     val childViewModel: ChildViewModel = viewModel(factory = childFactory)
+    val journalViewModel: JournalViewModel = viewModel(factory = journalFactory)
 
     NavHost(
         navController = navController,
@@ -101,10 +106,24 @@ fun AppNavGraph(
                     // TODO
                 },
                 onNavigateToJournal = {
-                    // TODO
+                    navController.navigate(Screen.Journal.createRoute(childId))
                 },
                 onNavigateToReview = {
                     // TODO
+                }
+            )
+        }
+
+        composable(Screen.Journal.route) { backStackEntry ->
+            val childId = backStackEntry.arguments
+                ?.getString("childId")
+                ?.toInt() ?: 0
+
+            JournalScreen(
+                childId = childId,
+                viewModel = journalViewModel,
+                onBack = {
+                    navController.popBackStack()
                 }
             )
         }

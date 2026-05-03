@@ -7,9 +7,11 @@ import com.example.emogrow.data.local.TokenManager
 import com.example.emogrow.data.remote.api.RetrofitInstance
 import com.example.emogrow.data.repository.AuthRepository
 import com.example.emogrow.data.repository.ChildRepository
+import com.example.emogrow.data.repository.JournalRepository
 import com.example.emogrow.navigation.AppNavGraph
 import com.example.emogrow.features.auth.viewmodel.AuthViewModelFactory
 import com.example.emogrow.features.children.viewmodel.ChildViewModelFactory
+import com.example.emogrow.features.journal.viewmodel.JournalViewModelFactory
 import com.example.emogrow.ui.theme.EmoGrowTheme
 
 class MainActivity : ComponentActivity() {
@@ -28,14 +30,21 @@ class MainActivity : ComponentActivity() {
             tokenManager = tokenManager
         )
 
+        val journalRepository = JournalRepository(
+            journalApi = RetrofitInstance.journalApi,
+            tokenManager = tokenManager
+        )
+
         val authFactory = AuthViewModelFactory(authRepository)
         val childFactory = ChildViewModelFactory(childRepository)
+        val journalFactory = JournalViewModelFactory(journalRepository)
 
         setContent {
             EmoGrowTheme {
                 AppNavGraph(
                     authFactory = authFactory,
-                    childFactory = childFactory
+                    childFactory = childFactory,
+                    journalFactory = journalFactory
                 )
             }
         }

@@ -1,0 +1,146 @@
+package com.example.emogrow.features.emotions.viewmodel
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.emogrow.data.remote.ApiErrorParser
+import com.example.emogrow.data.repository.EmotionRepository
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
+
+class EmotionViewModel(
+    private val repository: EmotionRepository
+) : ViewModel() {
+
+    private val _uiState = MutableStateFlow(EmotionUiState())
+    val uiState: StateFlow<EmotionUiState> = _uiState
+
+    fun loadLessonData(childId: Int) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                isLoading = true,
+                errorMessage = null
+            )
+
+            try {
+                val emotions = repository.getEmotions()
+                val flashcards = repository.getFlashcards()
+                val progress = repository.getChildProgress(childId)
+
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    emotions = emotions,
+                    flashcards = flashcards,
+                    progressList = progress
+                )
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    errorMessage = ApiErrorParser.parse(e)
+                )
+            }
+        }
+    }
+
+    fun openFlashcard(childId: Int, flashcardId: Int) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                isLoading = true,
+                errorMessage = null,
+                isCompleted = false
+            )
+
+            try {
+                val response = repository.viewFlashcard(childId, flashcardId)
+
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    selectedFlashcard = response.flashcard,
+                    selectedProgress = response.progress
+                )
+
+                refreshProgress(childId)
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    errorMessage = ApiErrorParser.parse(e)
+                )
+            }
+        }
+    }
+
+    fun flipFlashcard(childId: Int, flashcardId: Int) {
+        viewModelScope.launch {
+            try {
+                val progress = repository.flipFlashcard(childId, flashcardId)
+
+                _uiState.value = _uiState.value.copy(
+                    selectedProgress = progress
+                )
+
+                refreshProgress(childId)
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    errorMessage = ApiErrorParser.parse(e)
+                )
+            }
+        }
+    }
+
+    fun viewExplanation(childId: Int, flashcardId: Int) {
+        viewModelScope.launch {
+            try {
+                val progress = repository.viewExplanation(childId, flashcardId)
+
+                _uiState.value = _uiState.value.copy(
+                    selectedProgress = progress
+                )
+
+                refreshProgress(childId)
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    errorMessage = ApiErrorParser.parse(e)
+                )
+            }
+        }
+    }
+
+    fun completeFlashcard(childId: Int, flashcardId: Int) {
+        viewModelScope.launch {
+            try {
+                val progress = repository.completeFlashcard(childId, flashcardId)
+
+                _uiState.value = _uiState.value.copy(
+                    selectedProgress = progress,
+                    isCompleted = true
+                )
+
+                refreshProgress(childId)
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    errorMessage = ApiErrorParser.parse(e)
+                )
+            }
+        }
+    }
+
+    fun closeFlashcard() {
+        _uiState.value = _uiState.value.copy(
+            selectedFlashcard = null,
+            selectedProgress = null,
+            isCompleted = false
+        )
+    }
+
+    fun clearError() {
+        _uiState.value = _uiState.value.copy(errorMessage = null)
+    }
+
+    private suspend fun refreshProgress(childId: Int) {
+        val progress = repository.getChildProgress(childId)
+
+        _uiState.value = _uiState.value.copy(
+            progressList = progress
+        )
+    }
+}

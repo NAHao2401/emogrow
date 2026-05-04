@@ -15,7 +15,7 @@ class EmotionViewModel(
     private val _uiState = MutableStateFlow(EmotionUiState())
     val uiState: StateFlow<EmotionUiState> = _uiState
 
-    fun loadLessonData(childId: Int) {
+    fun loadEmotions() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(
                 isLoading = true,
@@ -24,15 +24,82 @@ class EmotionViewModel(
 
             try {
                 val emotions = repository.getEmotions()
-                val flashcards = repository.getFlashcards()
-                val progress = repository.getChildProgress(childId)
 
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    emotions = emotions,
-                    flashcards = flashcards,
-                    progressList = progress
+                    emotions = emotions
                 )
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    errorMessage = ApiErrorParser.parse(e)
+                )
+            }
+        }
+    }
+
+    fun loadFlashcardsByEmotion(
+        childId: Int,
+        emotionId: Int
+    ) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                isLoading = true,
+                errorMessage = null,
+                flashcards = emptyList(),
+                selectedFlashcard = null,
+                selectedProgress = null,
+                isCompleted = false
+            )
+
+            try {
+                val flashcards = repository.getFlashcardsByEmotion(emotionId)
+                val progress = repository.getChildProgress(childId)
+                val selectedEmotion = _uiState.value.emotions.firstOrNull {
+                    it.emotion_id == emotionId
+                }
+
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    flashcards = flashcards,
+                    progressList = progress,
+                    selectedEmotion = selectedEmotion
+                )
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    errorMessage = ApiErrorParser.parse(e)
+                )
+            }
+        }
+    }
+
+    fun loadFlashcardStudy(
+        childId: Int,
+        flashcardId: Int
+    ) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                isLoading = true,
+                errorMessage = null,
+                selectedFlashcard = null,
+                selectedProgress = null,
+                isCompleted = false
+            )
+
+            try {
+                val response = repository.viewFlashcard(
+                    childId = childId,
+                    flashcardId = flashcardId
+                )
+
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    selectedFlashcard = response.flashcard,
+                    selectedProgress = response.progress
+                )
+
+                refreshProgress(childId)
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,

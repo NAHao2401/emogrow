@@ -13,7 +13,9 @@ import com.example.emogrow.features.children.ui.ChildListScreen
 import com.example.emogrow.features.children.ui.CreateChildScreen
 import com.example.emogrow.features.children.viewmodel.ChildViewModel
 import com.example.emogrow.features.children.viewmodel.ChildViewModelFactory
-import com.example.emogrow.features.emotions.ui.EmotionLessonScreen
+import com.example.emogrow.features.emotions.ui.EmotionFlashcardListScreen
+import com.example.emogrow.features.emotions.ui.EmotionFlashcardStudyScreen
+import com.example.emogrow.features.emotions.ui.EmotionListScreen
 import com.example.emogrow.features.emotions.viewmodel.EmotionViewModel
 import com.example.emogrow.features.emotions.viewmodel.EmotionViewModelFactory
 import com.example.emogrow.features.home.ui.HomeScreen
@@ -99,7 +101,7 @@ fun AppNavGraph(
                 childId = childId,
                 viewModel = childViewModel,
                 onNavigateToLesson = {
-                    navController.navigate(Screen.EmotionLesson.createRoute(childId))
+                    navController.navigate(Screen.EmotionList.createRoute(childId))
                 },
                 onNavigateToGame = {
                     // TODO
@@ -113,16 +115,104 @@ fun AppNavGraph(
             )
         }
 
-        composable(Screen.EmotionLesson.route) { backStackEntry ->
+        composable(Screen.EmotionList.route) { backStackEntry ->
             val childId = backStackEntry.arguments
                 ?.getString("childId")
-                ?.toInt() ?: 0
+                ?.toIntOrNull() ?: 0
 
-            EmotionLessonScreen(
+            EmotionListScreen(
                 childId = childId,
                 viewModel = emotionViewModel,
                 onBack = {
                     navController.popBackStack()
+                },
+                onSelectEmotion = { emotion ->
+                    navController.navigate(
+                        Screen.EmotionFlashcardList.createRoute(
+                            childId = childId,
+                            emotionId = emotion.emotion_id
+                        )
+                    )
+                }
+            )
+        }
+
+        composable(Screen.EmotionFlashcardList.route) { backStackEntry ->
+            val childId = backStackEntry.arguments
+                ?.getString("childId")
+                ?.toInt() ?: 0
+
+            val emotionId = backStackEntry.arguments
+                ?.getString("emotionId")
+                ?.toInt() ?: 0
+
+            EmotionFlashcardListScreen(
+                childId = childId,
+                emotionId = emotionId,
+                viewModel = emotionViewModel,
+                onBack = {
+                    navController.popBackStack()
+                },
+                onSelectFlashcard = { flashcard ->
+                    navController.navigate(
+                        Screen.EmotionFlashcardStudy.createRoute(
+                            childId = childId,
+                            emotionId = emotionId,
+                            flashcardId = flashcard.flashcard_id
+                        )
+                    )
+                }
+            )
+        }
+
+        composable(Screen.EmotionFlashcardStudy.route) { backStackEntry ->
+            val childId = backStackEntry.arguments
+                ?.getString("childId")
+                ?.toInt() ?: 0
+
+            val emotionId = backStackEntry.arguments
+                ?.getString("emotionId")
+                ?.toInt() ?: 0
+
+            val flashcardId = backStackEntry.arguments
+                ?.getString("flashcardId")
+                ?.toInt() ?: 0
+
+            EmotionFlashcardStudyScreen(
+                childId = childId,
+                emotionId = emotionId,
+                flashcardId = flashcardId,
+                viewModel = emotionViewModel,
+                onBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(Screen.EmotionFlashcardList.route) { backStackEntry ->
+            val childId = backStackEntry.arguments
+                ?.getString("childId")
+                ?.toInt() ?: 0
+
+            val emotionId = backStackEntry.arguments
+                ?.getString("emotionId")
+                ?.toInt() ?: 0
+
+            EmotionFlashcardListScreen(
+                childId = childId,
+                emotionId = emotionId,
+                viewModel = emotionViewModel,
+                onBack = {
+                    navController.popBackStack()
+                },
+                onSelectFlashcard = { flashcard ->
+                    navController.navigate(
+                        Screen.EmotionFlashcardStudy.createRoute(
+                            childId = childId,
+                            emotionId = emotionId,
+                            flashcardId = flashcard.flashcard_id
+                        )
+                    )
                 }
             )
         }

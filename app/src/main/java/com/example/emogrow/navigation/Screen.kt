@@ -10,7 +10,19 @@ sealed class Screen(val route: String) {
         fun createRoute(childId: Int) = "home/$childId"
     }
 
-    object EmotionLesson : Screen("emotion_lesson/{childId}") {
-        fun createRoute(childId: Int) = "emotion_lesson/$childId"
+    object EmotionList : Screen("emotion_list/{childId}") {
+        fun createRoute(childId: Int) = "emotion_list/$childId"
+    }
+
+    object EmotionFlashcardList : Screen("emotion_flashcards/{childId}/{emotionId}") {
+        fun createRoute(childId: Int, emotionId: Int) = "emotion_flashcards/$childId/$emotionId"
+    }
+
+    object EmotionFlashcardStudy : Screen("emotion_flashcard_study/{childId}/{emotionId}/{flashcardId}") {
+        fun createRoute(
+            childId: Int,
+            emotionId: Int,
+            flashcardId: Int
+        ) = "emotion_flashcard_study/$childId/$emotionId/$flashcardId"
     }
 }

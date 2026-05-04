@@ -14,6 +14,8 @@ import com.example.emogrow.features.children.ui.ChildListScreen
 import com.example.emogrow.features.children.ui.CreateChildScreen
 import com.example.emogrow.features.children.viewmodel.ChildViewModel
 import com.example.emogrow.features.children.viewmodel.ChildViewModelFactory
+import com.example.emogrow.features.game.ui.GameScreen
+import com.example.emogrow.features.game.ui.GameViewModel
 import com.example.emogrow.features.home.ui.HomeScreen
 
 @Composable
@@ -98,13 +100,23 @@ fun AppNavGraph(
                     // TODO
                 },
                 onNavigateToGame = {
-                    // TODO
+                    navController.navigate(Screen.Game.route)
                 },
                 onNavigateToJournal = {
                     // TODO
                 },
                 onNavigateToReview = {
                     // TODO
+                }
+            )
+        }
+
+        composable(Screen.Game.route) {
+            val gameViewModel: GameViewModel = viewModel()
+            GameScreen(
+                viewModel = gameViewModel,
+                onFaceCompleted = { _, _ ->
+                    // Teammate se xu ly celebration va flow round.
                 }
             )
         }

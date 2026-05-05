@@ -745,40 +745,6 @@ private fun StudyCardBack(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Thống kê
-            progress?.let {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(22.dp),
-                    color = paleAccent,
-                    border = BorderStroke(
-                        1.dp,
-                        accentColor.copy(alpha = 0.08f)
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier.padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = "Theo dõi quá trình học",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = accentColor
-                        )
-
-                        Text(
-                            text = "Xem ${it.viewed_count} lần • Lật ${it.flip_count} lần • Giải thích ${it.explanation_viewed_count} lần",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-            }
-
             // Banner hoàn thành
             if (completedState) {
                 Surface(
@@ -808,13 +774,6 @@ private fun StudyCardBack(
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
-            }
-
-            TextButton(onClick = onViewFront) {
-                Text(
-                    text = "Chạm vào bất kỳ đâu trên thẻ để xem lại mặt trước",
-                    textAlign = TextAlign.Center
-                )
             }
         }
     }

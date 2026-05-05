@@ -5,7 +5,10 @@ sealed class Screen(val route: String) {
     object Register : Screen("register")
     object CreateChild : Screen("create_child")
     object ChildList : Screen("child_list")
-    object Game : Screen("game")
+    object Album : Screen("album")
+    object Game : Screen("game/{levelId}") {
+        fun createRoute(levelId: Int) = "game/$levelId"
+    }
 
     object Home : Screen("home/{childId}") {
         fun createRoute(childId: Int) = "home/$childId"

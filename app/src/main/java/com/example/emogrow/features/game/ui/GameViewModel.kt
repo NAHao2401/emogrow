@@ -38,6 +38,15 @@ class GameViewModel : ViewModel() {
         eventListener = listener
     }
 
+    fun setLevel(levelId: Int) {
+        val index = (levelId - 1).coerceAtLeast(0) % sampleRounds.size
+        if (index == currentRoundIndex && _uiState.value.currentRound == sampleRounds[index]) {
+            return
+        }
+        currentRoundIndex = index
+        _uiState.value = GameUiState(currentRound = sampleRounds[currentRoundIndex])
+    }
+
     fun startDrag(part: FacePart) {
         _uiState.value = _uiState.value.copy(draggedPart = part)
     }

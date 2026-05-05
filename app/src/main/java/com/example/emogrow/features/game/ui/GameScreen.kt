@@ -92,6 +92,10 @@ fun GameScreen(
     var showConfetti by remember { mutableStateOf(false) }
     var showSticker by remember { mutableStateOf(false) }
 
+    LaunchedEffect(levelId) {
+        viewModel.setLevel(levelId)
+    }
+
     LaunchedEffect(uiState.currentRound) {
         showConfetti = false
         showSticker = false

@@ -19,18 +19,24 @@ import com.example.emogrow.features.emotions.ui.EmotionListScreen
 import com.example.emogrow.features.emotions.viewmodel.EmotionViewModel
 import com.example.emogrow.features.emotions.viewmodel.EmotionViewModelFactory
 import com.example.emogrow.features.home.ui.HomeScreen
+import com.example.emogrow.features.review.ui.KnowledgeShelfScreen
+import com.example.emogrow.features.review.ui.ReviewScreen
+import com.example.emogrow.features.review.viewmodel.ReviewViewModel
+import com.example.emogrow.features.review.viewmodel.ReviewViewModelFactory
 
 @Composable
 fun AppNavGraph(
     authFactory: AuthViewModelFactory,
     childFactory: ChildViewModelFactory,
-    emotionFactory: EmotionViewModelFactory
+    emotionFactory: EmotionViewModelFactory,
+    reviewFactory: ReviewViewModelFactory
 ) {
     val navController = rememberNavController()
 
     val authViewModel: AuthViewModel = viewModel(factory = authFactory)
     val childViewModel: ChildViewModel = viewModel(factory = childFactory)
     val emotionViewModel: EmotionViewModel = viewModel(factory = emotionFactory)
+    val reviewViewModel: ReviewViewModel = viewModel(factory = reviewFactory)
 
     NavHost(
         navController = navController,
@@ -110,8 +116,34 @@ fun AppNavGraph(
                     // TODO
                 },
                 onNavigateToReview = {
-                    // TODO
+                    navController.navigate(Screen.Review.createRoute(childId))
                 }
+            )
+        }
+
+        composable(Screen.Review.route) { backStackEntry ->
+            val childId = backStackEntry.arguments
+                ?.getString("childId")
+                ?.toInt() ?: 0
+
+            ReviewScreen(
+                childId = childId,
+                viewModel = reviewViewModel,
+                onBack = { navController.popBackStack() },
+                onNavigateToKnowledgeShelf = {
+                    navController.navigate(Screen.KnowledgeShelf.createRoute(childId))
+                }
+            )
+        }
+
+        composable(Screen.KnowledgeShelf.route) { backStackEntry ->
+            val childId = backStackEntry.arguments
+                ?.getString("childId")
+                ?.toInt() ?: 0
+
+            KnowledgeShelfScreen(
+                viewModel = reviewViewModel,
+                onBack = { navController.popBackStack() }
             )
         }
 

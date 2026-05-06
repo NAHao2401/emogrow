@@ -25,4 +25,12 @@ sealed class Screen(val route: String) {
             flashcardId: Int
         ) = "emotion_flashcard_study/$childId/$emotionId/$flashcardId"
     }
+
+    object Review : Screen("review/{childId}") {
+        fun createRoute(childId: Int) = "review/$childId"
+    }
+
+    object KnowledgeShelf : Screen("knowledge_shelf/{childId}") {
+        fun createRoute(childId: Int) = "knowledge_shelf/$childId"
+    }
 }

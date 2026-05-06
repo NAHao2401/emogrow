@@ -105,11 +105,12 @@ fun JournalScreen(
                     .padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // 1. Nhật ký đã trồng (Thành quả) ở trên cùng
+                // 1. Nhật ký đã trồng ở trên cùng
+                Spacer(modifier = Modifier.height(30.dp))
                 LazyRow(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(80.dp),
+                        .height(110.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                     contentPadding = PaddingValues(horizontal = 16.dp)
                 ) {
@@ -133,19 +134,19 @@ fun JournalScreen(
                     ) {
                         // Cột bên trái: Mascot
                         Column(
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1.4f),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            if (uiState.phase == JournalPhase.SPROUTED || uiState.phase == JournalPhase.HEALTHY) {
-                                MascotMessage(
-                                    message = if (uiState.phase == JournalPhase.SPROUTED) 
-                                        "Mình cùng 'tưới nước yêu thương' nhé!" 
-                                    else if (uiState.isRecording)
+                            MascotMessage(
+                                message = when (uiState.phase) {
+                                    JournalPhase.PLANTING -> "Kéo hạt mầm xuống chậu để gieo cảm xúc nhé!"
+                                    JournalPhase.SPROUTED -> "Mình cùng 'tưới nước yêu thương' nhé!"
+                                    JournalPhase.HEALTHY -> if (uiState.isRecording)
                                         "Mình đang nghe nè..."
                                     else
                                         "Cây đã nở hoa thật đẹp!"
-                                )
-                            }
+                                }
+                            )
                         }
 
                         // Giữa: Chậu cây
@@ -158,12 +159,19 @@ fun JournalScreen(
                             ) {
                                 when (uiState.phase) {
                                     JournalPhase.PLANTING -> {
-                                        Text("Gieo cảm xúc hôm nay", fontWeight = FontWeight.Bold)
+                                        Box(
+                                            modifier = Modifier
+                                                .background(Color.Black.copy(alpha = 0.3f), RoundedCornerShape(20.dp))
+                                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                                        ) {
+                                            Text("Gieo cảm xúc hôm nay", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 16.sp)
+                                        }
                                         Spacer(modifier = Modifier.height(20.dp))
                                         Pot(onPositioned = { potPosition = it })
                                     }
                                     JournalPhase.SPROUTED -> {
                                         Box(contentAlignment = Alignment.TopCenter) {
+                                            // Hiệu ứng nước rơi
                                             if (showWaterDrops) {
                                                 Box(modifier = Modifier.requiredSize(0.dp), contentAlignment = Alignment.TopCenter) {
                                                     WaterDropsAnimation(onAnimationEnd = {
@@ -191,7 +199,7 @@ fun JournalScreen(
 
                         // Cột bên phải: Bình nước và Nút ghi âm xếp dọc
                         Column(
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1.2f),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(20.dp)
                         ) {
@@ -200,13 +208,13 @@ fun JournalScreen(
                                     onDrop = { showWaterDrops = true }
                                 )
                             }
-                            
+
                             if (uiState.phase == JournalPhase.HEALTHY) {
                                 WateringCanRecordButton(
                                     isRecording = uiState.isRecording,
                                     onClick = { viewModel.toggleRecording() }
                                 )
-                                
+
                                 if (uiState.isRecording) {
                                     Button(
                                         onClick = { viewModel.finishAndReset(childId) },
@@ -227,7 +235,7 @@ fun JournalScreen(
                     SeedTray(emotions = uiState.availableEmotions, onDrop = { viewModel.onSeedDropped(it) })
                 }
             }
-            
+
             if (uiState.isLoading) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             }
@@ -240,78 +248,87 @@ fun MascotMessage(message: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             modifier = Modifier
-                .background(Color(0xFFE1F5FE), RoundedCornerShape(12.dp))
+                .background(Color.White.copy(alpha = 0.9f), RoundedCornerShape(12.dp))
                 .padding(8.dp)
         ) {
-            Text(message, fontSize = 12.sp, textAlign = TextAlign.Center)
+            Text(message, fontSize = 11.sp, textAlign = TextAlign.Center, lineHeight = 14.sp)
         }
         Spacer(modifier = Modifier.height(8.dp))
-        Text("🤖", fontSize = 48.sp)
+        Image(
+            painter = painterResource(id = R.drawable.mascot),
+            contentDescription = "Mascot",
+            // Dùng requiredSize để Mascot không bị thu nhỏ khi văn bản dài
+            modifier = Modifier.requiredSize(120.dp)
+        )
+        Spacer(modifier = Modifier.height(14.dp))
     }
 }
 
 @Composable
 fun PlantThumbnail(emotionEmoji: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(contentAlignment = Alignment.Center) {
-            Text("🌻", fontSize = 40.sp)
-            Text(emotionEmoji, fontSize = 16.sp, modifier = Modifier.padding(bottom = 10.dp))
-        }
+    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(100.dp)) {
+        Image(
+            painter = painterResource(id = R.drawable.flower),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize()
+        )
+        Text(
+            text = emotionEmoji,
+            fontSize = 16.sp, // Kích thước vừa vặn trong nhị
+            // Dùng offset thay vì padding để đưa icon lên tâm nhị hoa
+            modifier = Modifier.offset(y = (-29).dp)
+        )
     }
 }
 
 @Composable
 fun Pot(onPositioned: (Offset) -> Unit = {}) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.onGloballyPositioned { onPositioned(it.positionInRoot()) }
-    ) {
-        Box(
-            modifier = Modifier
-                .width(110.dp)
-                .height(18.dp)
-                .background(Color(0xFFBF360C), RoundedCornerShape(4.dp))
-        )
-        Box(
-            modifier = Modifier
-                .width(90.dp)
-                .height(70.dp)
-                .background(
-                    Color(0xFFD84315),
-                    RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp)
-                )
-        )
-    }
+    Image(
+        painter = painterResource(id = R.drawable.pot),
+        contentDescription = "Pot",
+        modifier = Modifier
+            .size(120.dp)
+            .onGloballyPositioned { onPositioned(it.positionInRoot()) }
+    )
 }
 
 @Composable
 fun SproutedPlant(onPositioned: (Offset) -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("🌱", fontSize = 60.sp)
-        Spacer(modifier = Modifier.height((-18).dp))
-        Pot(onPositioned = onPositioned)
-    }
+    Image(
+        painter = painterResource(id = R.drawable.sprout),
+        contentDescription = "Sprout",
+        modifier = Modifier
+            .size(180.dp)
+            .onGloballyPositioned { onPositioned(it.positionInRoot()) }
+    )
 }
 
 @Composable
 fun HealthyFlower(emotion: String, onPositioned: (Offset) -> Unit, showFireworks: Boolean = false) {
     Box(contentAlignment = Alignment.TopCenter) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Box(contentAlignment = Alignment.Center) {
-                Text("🌻", fontSize = 120.sp)
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(bottom = 22.dp)) {
-                    Text(emotion, fontSize = 50.sp)
-                }
-            }
-            Spacer(modifier = Modifier.height((-28).dp))
-            Pot(onPositioned = onPositioned)
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(250.dp)
+                .onGloballyPositioned { onPositioned(it.positionInRoot()) }
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.flower),
+                contentDescription = "Flower",
+                modifier = Modifier.fillMaxSize()
+            )
+            Text(
+                text = emotion,
+                fontSize = 40.sp, // Kích thước vừa với nhị hoa lớn
+                modifier = Modifier.offset(y = (-74).dp)
+            )
         }
 
         if (showFireworks) {
             Box(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = 35.dp)
+                    .padding(top = 40.dp)
                     .requiredSize(0.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -323,22 +340,37 @@ fun HealthyFlower(emotion: String, onPositioned: (Offset) -> Unit, showFireworks
 
 @Composable
 fun RecordingStatus() {
-    Text("🔴 Đang ghi âm...", color = Color.Red, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+    Text(
+        "🔴 Đang ghi âm...",
+        color = Color.Red,
+        fontWeight = FontWeight.Bold,
+        fontSize = 14.sp,
+        modifier = Modifier.background(Color.White.copy(alpha = 0.7f), RoundedCornerShape(4.dp)).padding(4.dp)
+    )
 }
 
 @Composable
 fun WateringCanRecordButton(isRecording: Boolean, onClick: () -> Unit) {
     Box(
         modifier = Modifier
-            .size(80.dp)
+            .size(100.dp)
             .background(if (isRecording) Color.Red.copy(alpha = 0.2f) else Color.Transparent, CircleShape)
             .clickable(enabled = !isRecording) { onClick() },
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(if (isRecording) "🎤" else "🚿", fontSize = 40.sp) 
+            if (isRecording) {
+                Text("🎤", fontSize = 48.sp)
+            } else {
+                Image(
+                    painter = painterResource(id = R.drawable.watering_can),
+                    contentDescription = "Water Can",
+                    // Khóa cứng kích thước bình nước
+                    modifier = Modifier.requiredSize(70.dp)
+                )
+            }
             if (!isRecording) {
-                Text("Ghi âm", fontSize = 10.sp)
+                Text("Ghi âm", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -347,16 +379,27 @@ fun WateringCanRecordButton(isRecording: Boolean, onClick: () -> Unit) {
 @Composable
 fun SeedTray(emotions: List<EmotionSeed>, onDrop: (EmotionSeed) -> Unit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("Kéo hạt mầm vào chậu", style = MaterialTheme.typography.bodySmall)
+        Box(
+            modifier = Modifier
+                .background(Color.Black.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                .padding(horizontal = 12.dp, vertical = 4.dp)
+        ) {
+            Text("Kéo hạt mầm vào chậu", style = MaterialTheme.typography.bodySmall, color = Color.White, fontWeight = FontWeight.Bold)
+        }
+        Spacer(modifier = Modifier.height(8.dp))
         Row(
-            modifier = Modifier.fillMaxWidth().padding(8.dp), 
+            modifier = Modifier.fillMaxWidth().padding(8.dp),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             emotions.forEach { emotion ->
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    DraggableItem(emoji = emotion.emoji, isFromSide = false, onDrop = { onDrop(emotion) })
+                    DraggableItem(
+                        emoji = emotion.emoji,
+                        isFromSide = false,
+                        onDrop = { onDrop(emotion) }
+                    )
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text(emotion.name, fontSize = 12.sp)
+                    Text(emotion.name, fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -367,11 +410,18 @@ fun SeedTray(emotions: List<EmotionSeed>, onDrop: (EmotionSeed) -> Unit) {
 fun DraggableWateringCan(onDrop: () -> Unit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         DraggableItem(
-            emoji = "🚿", 
+            emoji = "",
             isFromSide = true,
             onDrop = onDrop
-        )
-        Text("Tưới nước", fontSize = 10.sp)
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.watering_can),
+                contentDescription = "Water Can",
+                // Khóa cứng kích thước bình nước
+                modifier = Modifier.requiredSize(70.dp)
+            )
+        }
+        Text("Tưới nước", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -417,9 +467,9 @@ fun WaterDropsAnimation(onAnimationEnd: () -> Unit) {
 
 @Composable
 fun CelebrationAnimation() {
-    val particles = remember { List(30) { Random.nextFloat() } } 
+    val particles = remember { List(30) { Random.nextFloat() } }
     val infiniteTransition = rememberInfiniteTransition()
-    
+
     val animProgress by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
@@ -429,14 +479,14 @@ fun CelebrationAnimation() {
         )
     )
 
-    Canvas(modifier = Modifier.requiredSize(400.dp)) { 
+    Canvas(modifier = Modifier.requiredSize(400.dp)) {
         val center = Offset(size.width / 2, size.height / 2)
         particles.forEachIndexed { index, randomValue ->
             val angle = (index.toFloat() / particles.size) * 2 * Math.PI
-            val distance = animProgress * 250f * (0.5f + randomValue) 
+            val distance = animProgress * 250f * (0.5f + randomValue)
             val x = center.x + (cos(angle) * distance).toFloat()
             val y = center.y + (sin(angle) * distance).toFloat()
-            
+
             drawCircle(
                 color = listOf(Color.Yellow, Color.Red, Color.Cyan, Color.Magenta, Color.Green)[index % 5],
                 radius = 12f * (1f - animProgress),
@@ -449,9 +499,10 @@ fun CelebrationAnimation() {
 
 @Composable
 fun DraggableItem(
-    emoji: String, 
+    emoji: String,
     isFromSide: Boolean,
-    onDrop: () -> Unit
+    onDrop: () -> Unit,
+    content: @Composable (() -> Unit)? = null
 ) {
     var offset by remember { mutableStateOf(Offset.Zero) }
     var isDragging by remember { mutableStateOf(false) }
@@ -465,11 +516,11 @@ fun DraggableItem(
                     onDragEnd = {
                         isDragging = false
                         val isDropped = if (isFromSide) {
-                            offset.x < -60 
+                            offset.x < -60
                         } else {
                             offset.y < -60
                         }
-                        
+
                         if (isDropped) {
                             onDrop()
                         }
@@ -481,10 +532,14 @@ fun DraggableItem(
                     }
                 )
             }
-            .size(60.dp)
-            .background(if (isDragging) Color.LightGray else Color(0xFFF5F5F5), CircleShape),
+            .size(70.dp) // Tăng kích thước bao ngoài để chứa vừa vặn bình nước
+            .background(if (isDragging) Color.LightGray.copy(alpha = 0.5f) else Color.Transparent, CircleShape),
         contentAlignment = Alignment.Center
     ) {
-        Text(emoji, fontSize = 30.sp)
+        if (content != null) {
+            content()
+        } else {
+            Text(emoji, fontSize = 30.sp)
+        }
     }
 }

@@ -56,11 +56,7 @@ fun GameScreen(
     val requiredCounts = remember(uiState.currentRound) {
         uiState.currentRound.targetFace.values.groupingBy { it }.eachCount()
     }
-    val placedPartKeys = uiState.placedParts.values
-        .filterNotNull()
-        .map { it.uniqueKey }
-        .toSet()
-    val placedPartIds = remember(placedPartKeys, requiredCounts) {
+    val placedPartIds = remember(uiState.placedParts, requiredCounts) {
         // Check if all required base IDs are satisfied by counting placed parts with each base ID
         val placedBaseCounts = uiState.placedParts.values
             .filterNotNull()
@@ -115,6 +111,7 @@ fun GameScreen(
                         placedParts = uiState.placedParts,
                         draggedPart = uiState.draggedPart,
                         dragPosition = uiState.dragPosition,
+                        requiredZones = uiState.currentRound.targetFace.keys,
                         onZonePositioned = { _, _ -> },
                         onPlacedPartTap = { zoneId ->
                             viewModel.removePart(zoneId)
@@ -125,7 +122,7 @@ fun GameScreen(
 
             PartsTray(
                 availableParts = uiState.currentRound.availableParts,
-                placedPartIds = placedPartKeys,
+                placedPartIds = placedPartIds,
                 onDragStart = { part, position ->
                     viewModel.startDrag(part)
                     viewModel.updateDragPosition(position)

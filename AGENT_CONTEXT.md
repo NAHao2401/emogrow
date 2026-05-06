@@ -43,9 +43,15 @@ ui/game/
 ## 3. Data Types (GameTypes.kt) — KHÔNG được sửa
 
 ```kotlin
-enum class EmotionType { HAPPY, SAD, ANGRY, SURPRISED, SCARED }
-enum class ZoneId { LEFT_EYE, RIGHT_EYE, NOSE, MOUTH }
-enum class PartType { EYE, NOSE, MOUTH }
+enum class EmotionType { HAPPY, SAD, ANGRY, SURPRISED, SCARED, WORRIED, SHY, PROUD }
+enum class ZoneId {
+    LEFT_EYE, RIGHT_EYE,
+    LEFT_EYEBROW, RIGHT_EYEBROW,
+    LEFT_CHEEK, RIGHT_CHEEK,
+    NOSE, MOUTH,
+    SWEAT
+}
+enum class PartType { EYE, NOSE, MOUTH, EYEBROW, CHEEK, SWEAT }
 
 data class FacePart(
     val id: String,           // "eye_happy", "mouth_smile", v.v.
@@ -142,10 +148,15 @@ onCelebrationDone: () -> Unit
 ```
 Tọa độ offset tính từ CENTER của hình tròn mặt:
 
-LEFT_EYE:   x = -72.dp,  y = -55.dp   | size = 64 × 56.dp
-RIGHT_EYE:  x = +72.dp,  y = -55.dp   | size = 64 × 56.dp
+LEFT_EYE:   x = -48.dp,  y = -72.dp   | size = 64 × 56.dp
+RIGHT_EYE:  x = +48.dp,  y = -72.dp   | size = 64 × 56.dp
+LEFT_EYEBROW:  x = -48.dp,  y = -100.dp  | size = 60 × 28.dp
+RIGHT_EYEBROW: x = +48.dp,  y = -100.dp  | size = 60 × 28.dp
+LEFT_CHEEK:    x = -80.dp,  y = +20.dp   | size = 52 × 40.dp
+RIGHT_CHEEK:   x = +80.dp,  y = +20.dp   | size = 52 × 40.dp
 NOSE:       x =   0.dp,  y =  +5.dp   | size = 48 × 44.dp
 MOUTH:      x =   0.dp,  y = +70.dp   | size = 80 × 48.dp
+SWEAT:       x = +72.dp,  y =  +5.dp  | size = 28 × 40.dp
 ```
 
 ### Drop zone visual states:
@@ -181,14 +192,35 @@ File mapping:
 - `mouth_smile` → `part_mouth_happy`
 - `mouth_frown` → `part_mouth_sad`
 - `mouth_angry` → `part_mouth_angry`
+ - `eye_surprised_left` → `part_eye_surprised_left`
+ - `eye_surprised_right` → `part_eye_surprised_right`
+ - `eye_worried_left` → `part_eye_worried_left`
+ - `eye_worried_right` → `part_eye_worried_right`
+ - `eye_shy_left` → `part_eye_shy_left`
+ - `eye_shy_right` → `part_eye_shy_right`
+ - `eye_proud` → `part_eye_proud`
+ - `eyebrows_scared_left` → `part_eyebrows_scared_left`
+ - `eyebrows_scared_right` → `part_eyebrows_scared_right`
+ - `eyebrows_shy_left` → `part_eyebrows_shy_left`
+ - `eyebrows_shy_right` → `part_eyebrows_shy_right`
+ - `mouth_surprised` → `part_mouth_surprised`
+ - `mouth_worried` → `part_mouth_worried`
+ - `mouth_shy` → `part_mouth_shy`
+ - `mouth_proud` → `part_mouth_proud`
+ - `mouth_scared` → `part_mouth_scared`
+ - `blush_shy` → `part_blush_shy`
+ - `sweat` → `part_sweat`
 
 ### Kích thước render:
 | Vị trí | Size |
 |--------|------|
 | Trong PartsTray card | 60.dp |
 | Trên FaceCanvas (eye) | 56.dp |
-| Trên FaceCanvas (nose) | 40.dp |
-| Trên FaceCanvas (mouth) | 64.dp |
+| Trên FaceCanvas (nose) | 42.dp |
+| Trên FaceCanvas (mouth) | 72.dp |
+| Trên FaceCanvas (eyebrow) | 52.dp |
+| Trên FaceCanvas (cheek) | 44.dp |
+| Trên FaceCanvas (sweat) | 24.dp |
 | Drag overlay | 64.dp + scale 1.15f |
 
 ---
@@ -273,7 +305,7 @@ object GameDesign {
 
 ---
 
-## 13. Bug Fixes Log (2026-05-04) — 3 lỗi đã fix
+## 14. Bug Fixes Log (2026-05-04) — 3 lỗi đã fix
 
 ### Bug 1 — Khay bộ phận không cuộn được khi hàng trên thừa bộ phận ✅
 
@@ -371,7 +403,7 @@ modifier = Modifier.size(
 
 ---
 
-## 14. Verification Checklist
+## 15. Verification Checklist
 
 Sau khi áp dụng 3 fixes, kiểm tra:
 
@@ -386,7 +418,7 @@ Sau khi áp dụng 3 fixes, kiểm tra:
 
 ---
 
-## 15. Files Modified (2026-05-04)
+## 16. Files Modified (2026-05-04)
 
 | File | Thay đổi |
 |------|----------|
@@ -434,7 +466,7 @@ Modifier.pointerInput(part.id) {
 
 ## 10. Sample Data (trong GameViewModel companion object)
 
-3 rounds: HAPPY → SAD → ANGRY, vòng lặp vô hạn.
+8 rounds: HAPPY → SAD → ANGRY → SCARED → SURPRISED → WORRIED → SHY → PROUD → (lặp lại)
 
 Mỗi round có 6–7 availableParts gồm: 3 loại mắt + mũi + 2-3 loại miệng.
 
@@ -463,4 +495,12 @@ nếu đó là round ôn tập (cảm xúc đã chơi trước đó).
 - [ ] Text tiếng Việt, có dấu đầy đủ
 - [ ] Comments tiếng Việt cho logic phức tạp
 - [ ] Không import thư viện ngoài (chỉ Compose built-ins + coroutines)
+
+## 13. Quy tắc chọn distractor cho availableParts
+
+- Label bộ phận dùng tên chung: "Mắt trái/phải", "Lông mày trái/phải", "Miệng", "Mũi", "Má", "Mồ hôi" — không ghi tên cảm xúc vào label
+- Ưu tiên distractor đối lập rõ về hình dạng (vui ↔ buồn ↔ giận)
+- Tránh đặt cùng màn: mouth_worried + mouth_scared, mouth_frown + mouth_sad, eyebrows_scared + eyebrows_shy, eye_worried + eye_sad
+- Mỗi màn có tối đa 3-4 distractor, không nhồi quá nhiều gây rối trẻ
+- Đảm bảo mỗi PartType trong targetFace có ít nhất 1 distractor cùng type để trẻ phải chọn, không đoán mò
 ```

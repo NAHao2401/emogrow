@@ -59,20 +59,8 @@ fun DraggablePart(
         rotation.animateTo(0f, animationSpec = tween(110))
     }
 
-    val cardTint = when (part.emotion) {
-        EmotionType.HAPPY -> Color(0xFFFFF9E0)
-        EmotionType.SAD -> Color(0xFFE8F4FF)
-        EmotionType.ANGRY -> Color(0xFFFFEEEE)
-        null -> Color(0xFFF5ECD7)
-        else -> Color(0xFFF5F5F5)
-    }
-    val borderColor = when (part.emotion) {
-        EmotionType.HAPPY -> GameDesign.happyEnd
-        EmotionType.SAD -> GameDesign.sadEnd
-        EmotionType.ANGRY -> GameDesign.angryEnd
-        null -> GameDesign.borderGold
-        else -> GameDesign.borderGold
-    }
+    val cardTint = GameDesign.partCardTint(part.emotion)
+    val borderColor = GameDesign.partCardBorder(part.emotion)
 
     Box(
         modifier = Modifier

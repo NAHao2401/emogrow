@@ -83,7 +83,7 @@ fun PartsTray(
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        val topPlaced = placedPartIds.contains(topPart.uniqueKey)
+                        val topPlaced = placedPartIds.contains(topPart.id)
                         DraggablePart(
                             part = topPart,
                             isPlaced = topPlaced,
@@ -93,7 +93,7 @@ fun PartsTray(
                         )
 
                         if (bottomPart != null) {
-                            val bottomPlaced = placedPartIds.contains(bottomPart.uniqueKey)
+                            val bottomPlaced = placedPartIds.contains(bottomPart.id)
                             DraggablePart(
                                 part = bottomPart,
                                 isPlaced = bottomPlaced,

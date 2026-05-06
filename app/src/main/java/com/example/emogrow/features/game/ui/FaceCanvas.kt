@@ -37,10 +37,15 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 
 private val zoneConfig = mapOf(
-    ZoneId.LEFT_EYE to ZoneSpec(PartType.EYE, 44.dp, 44.dp, (-52).dp, (-65).dp),
-    ZoneId.RIGHT_EYE to ZoneSpec(PartType.EYE, 44.dp, 44.dp, 52.dp, (-65).dp),
-    ZoneId.NOSE to ZoneSpec(PartType.NOSE, 34.dp, 34.dp, 0.dp, (-5).dp),
-    ZoneId.MOUTH to ZoneSpec(PartType.MOUTH, 60.dp, 40.dp, 0.dp, 58.dp)
+    ZoneId.LEFT_EYE to ZoneSpec(PartType.EYE, 64.dp, 56.dp, (-48).dp, (-55).dp),
+    ZoneId.RIGHT_EYE to ZoneSpec(PartType.EYE, 64.dp, 56.dp, 48.dp, (-55).dp),
+    ZoneId.LEFT_EYEBROW to ZoneSpec(PartType.EYEBROW, 60.dp, 28.dp, (-48).dp, (-83).dp),
+    ZoneId.RIGHT_EYEBROW to ZoneSpec(PartType.EYEBROW, 60.dp, 28.dp, 48.dp, (-83).dp),
+    ZoneId.LEFT_CHEEK to ZoneSpec(PartType.CHEEK, 52.dp, 40.dp, (-80).dp, 20.dp),
+    ZoneId.RIGHT_CHEEK to ZoneSpec(PartType.CHEEK, 52.dp, 40.dp, 80.dp, 20.dp),
+    ZoneId.NOSE to ZoneSpec(PartType.NOSE, 56.dp, 52.dp, 0.dp, (-3).dp),
+    ZoneId.MOUTH to ZoneSpec(PartType.MOUTH, 96.dp, 60.dp, 0.dp, 55.dp),
+    ZoneId.SWEAT to ZoneSpec(PartType.SWEAT, 28.dp, 40.dp, 72.dp, 5.dp)
 )
 
 private val faceShape = GenericShape { size, _ ->
@@ -68,6 +73,7 @@ fun FaceCanvas(
     placedParts: Map<ZoneId, FacePart?>,
     draggedPart: FacePart?,
     dragPosition: Offset,
+    requiredZones: Set<ZoneId>,
     onZonePositioned: (ZoneId, Offset) -> Unit,
     onPlacedPartTap: (ZoneId) -> Unit
 ) {
@@ -82,7 +88,7 @@ fun FaceCanvas(
             .border(3.dp, GameDesign.borderGold, faceShape),
         contentAlignment = Alignment.Center
     ) {
-        ZoneId.entries.forEach { zoneId ->
+        ZoneId.entries.filter { zoneId -> requiredZones.contains(zoneId) }.forEach { zoneId ->
             val spec = zoneConfig.getValue(zoneId)
             FaceDropZone(
                 modifier = Modifier
@@ -169,18 +175,29 @@ private fun BoxScope.FaceDropZone(
             FacePartDrawing(
                 part = placedPart,
                 modifier = Modifier
-                    .width(
-                        when (placedPart.type) {
-                            PartType.EYE -> 44.dp
-                            PartType.NOSE -> 34.dp
-                            PartType.MOUTH -> 60.dp
+                    .size(
+                        width = when (placedPart.type) {
+                            PartType.EYE -> 56.dp
+                            PartType.NOSE -> 60.dp
+                            PartType.MOUTH -> 104.dp
+                            PartType.EYEBROW -> 52.dp
+                            PartType.CHEEK -> 44.dp
+                            PartType.SWEAT -> 24.dp
+                        },
+                        height = when (placedPart.type) {
+                            PartType.EYE -> 50.dp
+                            PartType.NOSE -> 56.dp
+                            PartType.MOUTH -> 64.dp
+                            PartType.EYEBROW -> 24.dp
+                            PartType.CHEEK -> 32.dp
+                            PartType.SWEAT -> 34.dp
                         }
                     )
                     .graphicsLayer {
                         scaleX = placedScale
                         scaleY = placedScale
                     },
-                isMirrored = zoneId == ZoneId.RIGHT_EYE
+                isMirrored = zoneId == ZoneId.RIGHT_EYE || zoneId == ZoneId.RIGHT_EYEBROW
             )
         }
     }
@@ -192,6 +209,9 @@ private fun hoverColor(emotion: EmotionType?): Color = when (emotion) {
     EmotionType.ANGRY -> Color(0xFFD63031)
     EmotionType.SURPRISED -> Color(0xFF9B59B6)
     EmotionType.SCARED -> Color(0xFF2ECC71)
+    EmotionType.WORRIED -> Color(0xFF636E72)
+    EmotionType.SHY -> Color(0xFFF368E0)
+    EmotionType.PROUD -> Color(0xFFFFD32A)
     null -> Color(0xFFE8C97A)
 }
 

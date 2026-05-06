@@ -4,11 +4,21 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-enum class EmotionType { HAPPY, SAD, ANGRY, SURPRISED, SCARED }
+enum class EmotionType { HAPPY, SAD, ANGRY, SURPRISED, SCARED, WORRIED, SHY, PROUD }
 
-enum class ZoneId { LEFT_EYE, RIGHT_EYE, NOSE, MOUTH }
+enum class ZoneId {
+    LEFT_EYE,
+    RIGHT_EYE,
+    LEFT_EYEBROW,
+    RIGHT_EYEBROW,
+    LEFT_CHEEK,
+    RIGHT_CHEEK,
+    NOSE,
+    MOUTH,
+    SWEAT
+}
 
-enum class PartType { EYE, NOSE, MOUTH }
+enum class PartType { EYE, NOSE, MOUTH, EYEBROW, CHEEK, SWEAT }
 
 enum class EyeSide { LEFT, RIGHT, NONE }
 

@@ -14,7 +14,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.emogrow.ui.theme.Orange
 
 @Composable
 fun SharedBottomNavBar(
@@ -23,26 +22,25 @@ fun SharedBottomNavBar(
     onEmotionClick: () -> Unit,
     onShelfClick: () -> Unit,
     onGameClick: () -> Unit = {},
-    onShopClick: () -> Unit = {},
-    onProfileClick: () -> Unit = {}
+    onSettingsClick: () -> Unit = {}
 ) {
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .height(80.dp),
-        color = Color.White,
+            .height(90.dp)
+            .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)),
+        color = Color(0xFFFFF8E1),
         shadowElevation = 16.dp
     ) {
         Row(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().padding(bottom = 8.dp),
             horizontalArrangement = Arrangement.SpaceAround,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            SharedNavItem("Cảm Xúc", "🎭", currentTab == "emotion", onEmotionClick)
+            SharedNavItem("Lọ Cảm Xúc", "🍯", currentTab == "emotion", onEmotionClick)
             SharedNavItem("Kệ Sách", "📚", currentTab == "shelf", onShelfClick)
-            SharedNavItem("Trò Chơi", "🎮", currentTab == "game", onGameClick)
-            SharedNavItem("Cửa Hàng", "🛒", currentTab == "shop", onShopClick)
-            SharedNavItem("Cá Nhân", "👤", currentTab == "profile", onProfileClick)
+            SharedNavItem("Trò chơi", "🎮", currentTab == "game", onGameClick)
+            SharedNavItem("Cài đặt", "⚙️", currentTab == "settings", onSettingsClick)
         }
     }
 }
@@ -60,16 +58,16 @@ private fun SharedNavItem(
         modifier = Modifier
             .padding(4.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(if (isActive) Orange.copy(alpha = 0.2f) else Color.Transparent)
-            .clickable(enabled = !isActive, onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 4.dp)
+            .background(if (isActive) Color(0xFFFFE0B2) else Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 6.dp)
     ) {
         Text(text = icon, fontSize = 24.sp)
         Text(
             text = label,
-            fontSize = 10.sp,
-            color = if (isActive) Orange else Color.Gray,
-            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal
+            fontSize = 12.sp,
+            color = if (isActive) Color(0xFF5D4037) else Color.Gray,
+            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium
         )
     }
 }

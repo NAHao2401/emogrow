@@ -1,6 +1,5 @@
 package com.example.emogrow.features.review.ui
 
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -27,7 +26,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -61,16 +59,11 @@ fun KnowledgeShelfScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(SkyBlue, Cream, LightGreen)
-                )
-            )
+            .background(Color(0xFFFFF9C4)) // Warm light yellow background
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = 100.dp)
         ) {
             // A. Header Card
             ShelfHeader(
@@ -79,30 +72,42 @@ fun KnowledgeShelfScreen(
             )
 
             // Scrollable content
-            Column(
+            Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(20.dp)
+                    .weight(1f)
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 16.dp)
+                    .shadow(8.dp, RoundedCornerShape(24.dp))
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(Color(0xFF8B4513).copy(alpha = 0.8f)) // Outer frame
+                    .padding(8.dp)
+                    .background(Color(0xFFD2B48C), RoundedCornerShape(16.dp)) // Inner wood
             ) {
-                // B. 3 Book Shelves
-                shelves.forEach { shelf ->
-                    BookShelfItem(
-                        shelfData = shelf,
-                        readBooks = uiState.readBooks,
-                        onBookClick = { viewModel.openBookDialog(it) }
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // B. 3 Book Shelves
+                    shelves.forEach { shelf ->
+                        BookShelfItem(
+                            shelfData = shelf,
+                            readBooks = uiState.readBooks,
+                            onBookClick = { viewModel.openBookDialog(it) }
+                        )
+                    }
+
+                    // C. Sticker Album Section
+                    StickerAlbumSection(
+                        stickers = allStickers.take(12),
+                        unlockedStickers = uiState.unlockedStickers,
+                        onStickerClick = { viewModel.openStickerPopup(it) }
                     )
+
+                    Spacer(modifier = Modifier.height(100.dp))
                 }
-
-                // C. Sticker Album Section
-                StickerAlbumSection(
-                    stickers = allStickers.take(12),
-                    unlockedStickers = uiState.unlockedStickers,
-                    onStickerClick = { viewModel.openStickerPopup(it) }
-                )
-
-                Spacer(modifier = Modifier.height(100.dp))
             }
         }
 
@@ -152,7 +157,6 @@ fun KnowledgeShelfScreen(
             isOpen = uiState.isStickerModalOpen,
             onDismiss = { viewModel.closeStickerModal() },
             onStickerClick = { sticker ->
-                val book = viewModel.getStickerUnlockBook(sticker)
                 viewModel.openStickerPopup(sticker)
             }
         )
@@ -188,51 +192,71 @@ private fun ShelfHeader(onBack: () -> Unit, onAlbumClick: () -> Unit) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconButton(
-            onClick = onBack,
-            modifier = Modifier
-                .size(44.dp)
-                .background(Color.White.copy(alpha = 0.8f), CircleShape)
+        Surface(
+            modifier = Modifier.size(44.dp),
+            shape = CircleShape,
+            color = Color.White,
+            shadowElevation = 2.dp,
+            onClick = onBack
         ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Back",
-                tint = Color.DarkGray
-            )
+            Box(contentAlignment = Alignment.Center) {
+                Image(
+                    painter = painterResource(id = R.drawable.ic_nav_home),
+                    contentDescription = "Home",
+                    modifier = Modifier.size(28.dp)
+                )
+            }
         }
 
         Text(
             text = "Kệ Sách Tri Thức",
             fontSize = 28.sp,
             fontWeight = FontWeight.Bold,
-            color = Color.White,
-            modifier = Modifier.shadow(2.dp, ambientColor = Color.Black.copy(alpha = 0.5f))
+            color = Color(0xFF5D4037),
+            modifier = Modifier.shadow(0.dp)
         )
 
         Surface(
-            modifier = Modifier.height(36.dp),
-            shape = RoundedCornerShape(18.dp),
-            color = Wheat.copy(alpha = 0.9f),
+            modifier = Modifier.height(44.dp),
+            shape = RoundedCornerShape(12.dp),
+            color = Color(0xFFF5DEB3),
             shadowElevation = 2.dp,
             onClick = onAlbumClick
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
+                modifier = Modifier.padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.CollectionsBookmark,
-                    contentDescription = null,
-                    tint = Color(0xFF8B4513),
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = "Album Sticker",
-                    fontSize = 12.sp,
-                    color = Color(0xFF8B4513),
-                    fontWeight = FontWeight.Medium
-                )
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .background(Color(0xFF3498DB), RoundedCornerShape(4.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CollectionsBookmark,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+                Column {
+                    Text(
+                        text = "Album",
+                        fontSize = 10.sp,
+                        color = Color(0xFF5D4037),
+                        fontWeight = FontWeight.Bold,
+                        lineHeight = 10.sp
+                    )
+                    Text(
+                        text = "Sticker",
+                        fontSize = 10.sp,
+                        color = Color(0xFF5D4037),
+                        fontWeight = FontWeight.Bold,
+                        lineHeight = 10.sp
+                    )
+                }
             }
         }
     }
@@ -245,41 +269,59 @@ private fun BookShelfItem(
     onBookClick: (Book) -> Unit
 ) {
     Column {
-        Text(
-            text = shelfData.date,
-            fontSize = 12.sp,
-            color = Color.Gray,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier.padding(start = 8.dp, bottom = 4.dp)
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(bottom = 8.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .background(Color(0xFF3498DB), RoundedCornerShape(4.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(text = "📅", fontSize = 14.sp)
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = shelfData.date,
+                fontSize = 16.sp,
+                color = Color.White,
+                fontWeight = FontWeight.Bold
+            )
+        }
 
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(140.dp)
-                .background(BrownWood.copy(alpha = 0.8f), RoundedCornerShape(8.dp))
+                .height(180.dp)
         ) {
-            Canvas(
+            // Books shelf surface
+            Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(8.dp)
+                    .fillMaxWidth()
+                    .height(160.dp)
+                    .background(Color(0xFF8B4513).copy(alpha = 0.4f), RoundedCornerShape(8.dp))
             ) {
-                repeat(5) { i ->
-                    drawLine(
-                        color = BrownWood.copy(alpha = 0.3f),
-                        start = androidx.compose.ui.geometry.Offset(0f, (size.height / 5) * i),
-                        end = androidx.compose.ui.geometry.Offset(size.width, (size.height / 5) * i),
-                        strokeWidth = 1f
-                    )
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val plankWidth = size.width / 10
+                    for (i in 1..9) {
+                        drawLine(
+                            color = Color(0xFF5D4037).copy(alpha = 0.2f),
+                            start = androidx.compose.ui.geometry.Offset(i * plankWidth, 0f),
+                            end = androidx.compose.ui.geometry.Offset(i * plankWidth, size.height),
+                            strokeWidth = 1.dp.toPx()
+                        )
+                    }
                 }
             }
 
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(12.dp)
-                    .align(Alignment.TopStart),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    .padding(horizontal = 12.dp)
+                    .align(Alignment.CenterStart),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.Bottom
             ) {
                 shelfData.books.forEach { book ->
                     BookItem(
@@ -288,30 +330,40 @@ private fun BookShelfItem(
                         onClick = { onBookClick(book) }
                     )
                 }
+
+                // Decorative plant if room
+                if (shelfData.books.size < 4) {
+                    Box(
+                        modifier = Modifier
+                            .size(60.dp)
+                            .padding(bottom = 8.dp),
+                        contentAlignment = Alignment.BottomCenter
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.img_mascot_plant),
+                            contentDescription = null,
+                            modifier = Modifier.size(50.dp)
+                        )
+                    }
+                }
             }
 
+            // Shelf bottom ledge
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(12.dp)
+                    .height(16.dp)
                     .align(Alignment.BottomCenter)
                     .background(
                         Brush.verticalGradient(
                             colors = listOf(
-                                BrownWood.copy(alpha = 0.9f),
-                                BrownWood.copy(alpha = 0.6f)
+                                Color(0xFF5D4037),
+                                Color(0xFF3E2723)
                             )
-                        )
+                        ),
+                        RoundedCornerShape(bottomStart = 8.dp, bottomEnd = 8.dp)
                     )
             )
-
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(8.dp)
-            ) {
-                Text(text = "🪴", fontSize = 24.sp)
-            }
         }
     }
 }
@@ -322,35 +374,56 @@ private fun BookItem(
     isRead: Boolean,
     onClick: () -> Unit
 ) {
-    val bookImageRes = when (book.id) {
-        "1", "2", "10" -> R.drawable.img_book_red
-        "3" -> R.drawable.img_book_orange
-        "4", "7", "9" -> R.drawable.img_book_yellow
-        "5" -> R.drawable.img_book_blue
-        "6", "8" -> R.drawable.img_book_pink
-        else -> R.drawable.img_book_purple
-    }
-
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
             .width(90.dp)
             .clickable(onClick = onClick)
+            .padding(bottom = 8.dp)
     ) {
         Box(
             modifier = Modifier
-                .width(75.dp)
-                .height(95.dp)
-                .shadow(4.dp, RoundedCornerShape(4.dp))
-                .clip(RoundedCornerShape(4.dp)),
+                .width(85.dp)
+                .height(130.dp)
+                .shadow(4.dp, RoundedCornerShape(8.dp))
+                .clip(RoundedCornerShape(8.dp))
+                .background(book.color),
             contentAlignment = Alignment.Center
         ) {
-            Image(
-                painter = painterResource(id = bookImageRes),
-                contentDescription = book.title,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Fit
-            )
+            Column(
+                modifier = Modifier.fillMaxSize().padding(4.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = book.title,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    lineHeight = 12.sp
+                )
+
+                Text(
+                    text = book.emoji,
+                    fontSize = 32.sp
+                )
+
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "Ngày gieo mầm",
+                        fontSize = 8.sp,
+                        color = Color.White.copy(alpha = 0.8f)
+                    )
+                    Text(
+                        text = "20/05/2024",
+                        fontSize = 8.sp,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
 
             // Read badge
             if (isRead) {
@@ -366,25 +439,6 @@ private fun BookItem(
                 }
             }
         }
-
-        Spacer(modifier = Modifier.height(4.dp))
-
-        Text(
-            text = book.title,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Medium,
-            color = Color.DarkGray,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center
-        )
-
-        Text(
-            text = book.author,
-            fontSize = 8.sp,
-            color = Color.Gray,
-            textAlign = TextAlign.Center
-        )
     }
 }
 
@@ -394,55 +448,68 @@ private fun StickerAlbumSection(
     unlockedStickers: Set<String>,
     onStickerClick: (Sticker) -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(
-                Color(0xFFFDF5E6).copy(alpha = 0.9f),
-                RoundedCornerShape(16.dp)
-            )
-            .padding(16.dp)
-    ) {
+    Column {
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(bottom = 8.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .background(StickerGold.copy(alpha = 0.3f), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(text = "📔", fontSize = 18.sp)
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Album Sticker - Đã có kèm",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF8B4513)
-                )
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .background(Color(0xFFF1C40F), RoundedCornerShape(4.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(text = "📔", fontSize = 14.sp)
             }
-            Text(text = "🌸", fontSize = 20.sp)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "Cuốn Album - Bộ sưu tập Sticker",
+                fontSize = 16.sp,
+                color = Color.White,
+                fontWeight = FontWeight.Bold
+            )
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(4),
-            modifier = Modifier.height(280.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            userScrollEnabled = false
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(260.dp)
+                .background(Color(0xFFFDF5E6), RoundedCornerShape(16.dp))
+                .border(2.dp, Color(0xFF8B4513).copy(alpha = 0.5f), RoundedCornerShape(16.dp))
         ) {
-            items(stickers) { sticker ->
-                StickerItem(
-                    sticker = sticker,
-                    isUnlocked = unlockedStickers.contains(sticker.id),
-                    onClick = { onStickerClick(sticker) }
-                )
+            // Binder rings
+            Column(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(start = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                repeat(4) {
+                    Surface(
+                        modifier = Modifier.size(12.dp),
+                        shape = CircleShape,
+                        color = Color.LightGray,
+                        shadowElevation = 1.dp
+                    ) {}
+                }
+            }
+
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(3),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(start = 32.dp, top = 16.dp, end = 16.dp, bottom = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                userScrollEnabled = false
+            ) {
+                items(stickers.take(9)) { sticker ->
+                    StickerItem(
+                        sticker = sticker,
+                        isUnlocked = unlockedStickers.contains(sticker.id),
+                        onClick = { onStickerClick(sticker) }
+                    )
+                }
             }
         }
     }
@@ -463,35 +530,20 @@ private fun StickerItem(
 
     Box(
         modifier = Modifier
-            .aspectRatio(1f)
-            .shadow(1.dp, RoundedCornerShape(8.dp))
-            .clip(RoundedCornerShape(8.dp))
+            .aspectRatio(1.2f)
+            .shadow(2.dp, RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(12.dp))
             .background(Color.White)
-            .border(
-                width = 2.dp,
-                color = StickerGold,
-                shape = RoundedCornerShape(8.dp)
-            )
-            .clickable(onClick = onClick)
-            .padding(4.dp),
+            .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Image(
-                painter = painterResource(id = stickerImageRes),
-                contentDescription = sticker.name,
-                modifier = Modifier
-                    .size(40.dp)
-                    .alpha(if (isUnlocked) 1f else 0.5f)
-            )
-            Text(
-                text = sticker.name,
-                fontSize = 8.sp,
-                color = Color.Gray
-            )
-        }
+        Image(
+            painter = painterResource(id = stickerImageRes),
+            contentDescription = sticker.name,
+            modifier = Modifier
+                .size(50.dp)
+                .alpha(if (isUnlocked) 1f else 0.3f)
+        )
     }
 }
 
@@ -504,65 +556,89 @@ private fun TeddyMascot(
     onDismissBubble: () -> Unit,
     onBookClick: (Book) -> Unit
 ) {
-    val rotation by animateFloatAsState(
-        targetValue = if (isBubbleOpen) 5f else 0f,
-        animationSpec = tween(durationMillis = 300),
-        label = "teddyRotation"
-    )
-
     Box(
         modifier = modifier
-            .size(80.dp),
-        contentAlignment = Alignment.Center
+            .size(120.dp),
+        contentAlignment = Alignment.BottomEnd
     ) {
         // Bubble (if open)
         if (isBubbleOpen && suggestedBooks.isNotEmpty()) {
             Column(
                 modifier = Modifier
-                    .offset(x = (-80).dp, y = (-80).dp)
-                    .width(150.dp)
-                    .background(Color.White, RoundedCornerShape(12.dp))
+                    .offset(y = (-100).dp)
+                    .width(180.dp)
+                    .background(Color.White, RoundedCornerShape(16.dp))
+                    .border(2.dp, Color(0xFFF1C40F), RoundedCornerShape(16.dp))
                     .padding(12.dp)
-                    .shadow(4.dp, RoundedCornerShape(12.dp))
+                    .shadow(4.dp, RoundedCornerShape(16.dp))
             ) {
                 Text(
                     text = "Bạn có muốn đọc một câu chuyện vui vẻ hôm nay không?",
                     fontSize = 12.sp,
-                    color = Color.DarkGray
+                    color = Color.DarkGray,
+                    fontWeight = FontWeight.Medium
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                suggestedBooks.take(3).forEach { book ->
-                    Text(
-                        text = "📚 ${book.title}",
-                        fontSize = 10.sp,
-                        color = DarkPurple,
+                suggestedBooks.take(2).forEach { book ->
+                    Row(
                         modifier = Modifier
+                            .fillMaxWidth()
                             .clickable { onBookClick(book) }
-                            .padding(vertical = 2.dp)
-                    )
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(text = book.emoji, fontSize = 16.sp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = book.title,
+                            fontSize = 11.sp,
+                            color = Color(0xFF6A1B9A),
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
-                Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "✕",
-                    fontSize = 12.sp,
+                    text = "Đóng",
+                    fontSize = 10.sp,
                     color = Color.Gray,
                     modifier = Modifier
                         .align(Alignment.End)
                         .clickable { onDismissBubble() }
+                        .padding(top = 4.dp)
                 )
             }
         }
 
-        Image(
-            painter = painterResource(id = R.drawable.img_mascot_bear),
-            contentDescription = "Teddy Mascot",
+        // The Puppy/Mascot reading a book
+        Box(
             modifier = Modifier
-                .fillMaxSize()
-                .rotate(rotation)
-                .clickable(onClick = onTeddyClick)
-        )
+                .size(100.dp)
+                .clickable(onClick = onTeddyClick),
+            contentAlignment = Alignment.BottomEnd
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.img_mascot_bear),
+                contentDescription = "Teddy Mascot",
+                modifier = Modifier.size(80.dp)
+            )
+            
+            // Mock book the mascot is reading
+            Surface(
+                modifier = Modifier
+                    .size(40.dp, 30.dp)
+                    .offset(x = (-10).dp, y = (-5).dp),
+                color = Color(0xFFF1C40F),
+                shape = RoundedCornerShape(4.dp),
+                shadowElevation = 2.dp
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(text = "📖", fontSize = 20.sp)
+                }
+            }
+        }
     }
 }
 
 
-private val DarkPurple = Color(0xFF6A1B9A)

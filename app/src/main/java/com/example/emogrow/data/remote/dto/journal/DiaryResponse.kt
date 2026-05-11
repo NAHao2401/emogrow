@@ -8,5 +8,6 @@ data class DiaryResponse(
     val emotion_color: String?,
     val plant_state: String,
     val feeling_note: String?,
+    val diary_date: String?,
     val created_at: String
 )

@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -34,12 +35,16 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.emogrow.R
+import com.example.emogrow.data.remote.dto.journal.DiaryResponse
 import com.example.emogrow.features.journal.viewmodel.JournalPhase
 import com.example.emogrow.features.journal.viewmodel.JournalUiState
 import com.example.emogrow.features.journal.viewmodel.JournalViewModel
 import com.example.emogrow.features.journal.viewmodel.EmotionSeed
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -56,6 +61,13 @@ fun JournalScreen(
     var potPosition by remember { mutableStateOf(Offset.Zero) }
     var showFireworks by remember { mutableStateOf(false) }
     var showWaterDrops by remember { mutableStateOf(false) }
+    
+    var selectedDiary by remember { mutableStateOf<DiaryResponse?>(null) }
+    var showDatePicker by remember { mutableStateOf(false) }
+
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = uiState.selectedDateMillis
+    )
 
     // Load data from backend
     LaunchedEffect(childId) {
@@ -69,6 +81,52 @@ fun JournalScreen(
             delay(4500)
             showFireworks = false
         }
+    }
+
+    if (showDatePicker) {
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDatePicker = false
+                    datePickerState.selectedDateMillis?.let { millis ->
+                        viewModel.onDateSelected(childId, millis)
+                    }
+                }) {
+                    Text("Chọn")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text("Hủy")
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
+    if (selectedDiary != null) {
+        AlertDialog(
+            onDismissRequest = { selectedDiary = null },
+            title = { Text("Chi tiết cảm xúc") },
+            text = {
+                Column {
+                    Text("Cảm xúc: ${selectedDiary?.emotion_emoji} ${selectedDiary?.emotion_name}", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Ngày: ${selectedDiary?.diary_date ?: selectedDiary?.created_at}")
+                    if (!selectedDiary?.feeling_note.isNullOrEmpty()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("Ghi chú: ${selectedDiary?.feeling_note}")
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { selectedDiary = null }) {
+                    Text("Đóng")
+                }
+            }
+        )
     }
 
     Scaffold(
@@ -106,7 +164,21 @@ fun JournalScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // 1. Nhật ký đã trồng ở trên cùng
-                Spacer(modifier = Modifier.height(30.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier
+                        .background(Color.White.copy(alpha = 0.7f), RoundedCornerShape(16.dp))
+                        .clickable { showDatePicker = true }
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(Icons.Default.DateRange, contentDescription = "Chọn ngày", tint = Color.DarkGray)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    val sdfDisplay = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
+                    Text("Ngày: ${sdfDisplay.format(Date(uiState.selectedDateMillis))}", fontWeight = FontWeight.Bold, color = Color.DarkGray)
+                }
+                Spacer(modifier = Modifier.height(8.dp))
                 LazyRow(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -114,8 +186,10 @@ fun JournalScreen(
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                     contentPadding = PaddingValues(horizontal = 16.dp)
                 ) {
-                    items(uiState.pastJournals) { emoji ->
-                        PlantThumbnail(emoji)
+                    items(uiState.pastJournals) { diary ->
+                        PlantThumbnail(diary.emotion_emoji) {
+                            selectedDiary = diary
+                        }
                     }
                 }
 
@@ -159,18 +233,11 @@ fun JournalScreen(
                             ) {
                                 when (uiState.phase) {
                                     JournalPhase.PLANTING -> {
-                                        Box(
-                                            modifier = Modifier
-                                                .background(Color.Black.copy(alpha = 0.3f), RoundedCornerShape(20.dp))
-                                                .padding(horizontal = 16.dp, vertical = 8.dp)
-                                        ) {
-                                            Text("Gieo cảm xúc hôm nay", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 16.sp)
-                                        }
-                                        Spacer(modifier = Modifier.height(20.dp))
                                         Pot(onPositioned = { potPosition = it })
                                     }
                                     JournalPhase.SPROUTED -> {
                                         Box(contentAlignment = Alignment.TopCenter) {
+                                            SproutedPlant(onPositioned = { potPosition = it })
                                             // Hiệu ứng nước rơi
                                             if (showWaterDrops) {
                                                 Box(modifier = Modifier.requiredSize(0.dp), contentAlignment = Alignment.TopCenter) {
@@ -180,7 +247,6 @@ fun JournalScreen(
                                                     })
                                                 }
                                             }
-                                            SproutedPlant(onPositioned = { potPosition = it })
                                         }
                                     }
                                     JournalPhase.HEALTHY -> {
@@ -257,7 +323,6 @@ fun MascotMessage(message: String) {
         Image(
             painter = painterResource(id = R.drawable.mascot),
             contentDescription = "Mascot",
-            // Dùng requiredSize để Mascot không bị thu nhỏ khi văn bản dài
             modifier = Modifier.requiredSize(120.dp)
         )
         Spacer(modifier = Modifier.height(14.dp))
@@ -265,8 +330,8 @@ fun MascotMessage(message: String) {
 }
 
 @Composable
-fun PlantThumbnail(emotionEmoji: String) {
-    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(100.dp)) {
+fun PlantThumbnail(emotionEmoji: String, onClick: () -> Unit = {}) {
+    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(100.dp).clickable { onClick() }) {
         Image(
             painter = painterResource(id = R.drawable.flower),
             contentDescription = null,
@@ -274,8 +339,7 @@ fun PlantThumbnail(emotionEmoji: String) {
         )
         Text(
             text = emotionEmoji,
-            fontSize = 16.sp, // Kích thước vừa vặn trong nhị
-            // Dùng offset thay vì padding để đưa icon lên tâm nhị hoa
+            fontSize = 16.sp,
             modifier = Modifier.offset(y = (-29).dp)
         )
     }
@@ -287,7 +351,7 @@ fun Pot(onPositioned: (Offset) -> Unit = {}) {
         painter = painterResource(id = R.drawable.pot),
         contentDescription = "Pot",
         modifier = Modifier
-            .size(120.dp)
+            .size(180.dp)
             .onGloballyPositioned { onPositioned(it.positionInRoot()) }
     )
 }
@@ -319,7 +383,7 @@ fun HealthyFlower(emotion: String, onPositioned: (Offset) -> Unit, showFireworks
             )
             Text(
                 text = emotion,
-                fontSize = 40.sp, // Kích thước vừa với nhị hoa lớn
+                fontSize = 40.sp,
                 modifier = Modifier.offset(y = (-74).dp)
             )
         }
@@ -365,7 +429,6 @@ fun WateringCanRecordButton(isRecording: Boolean, onClick: () -> Unit) {
                 Image(
                     painter = painterResource(id = R.drawable.watering_can),
                     contentDescription = "Water Can",
-                    // Khóa cứng kích thước bình nước
                     modifier = Modifier.requiredSize(70.dp)
                 )
             }
@@ -417,7 +480,6 @@ fun DraggableWateringCan(onDrop: () -> Unit) {
             Image(
                 painter = painterResource(id = R.drawable.watering_can),
                 contentDescription = "Water Can",
-                // Khóa cứng kích thước bình nước
                 modifier = Modifier.requiredSize(70.dp)
             )
         }
@@ -532,7 +594,7 @@ fun DraggableItem(
                     }
                 )
             }
-            .size(70.dp) // Tăng kích thước bao ngoài để chứa vừa vặn bình nước
+            .size(70.dp)
             .background(if (isDragging) Color.LightGray.copy(alpha = 0.5f) else Color.Transparent, CircleShape),
         contentAlignment = Alignment.Center
     ) {

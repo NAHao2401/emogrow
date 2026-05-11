@@ -3,11 +3,15 @@ package com.example.emogrow.features.journal.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.emogrow.data.remote.dto.journal.DiaryResponse
 import com.example.emogrow.data.repository.JournalRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 enum class JournalPhase {
     PLANTING,
@@ -20,7 +24,8 @@ data class JournalUiState(
     val selectedEmotion: EmotionSeed? = null,
     val isWatered: Boolean = false,
     val isRecording: Boolean = false,
-    val pastJournals: List<String> = emptyList(),
+    val pastJournals: List<DiaryResponse> = emptyList(),
+    val selectedDateMillis: Long = System.currentTimeMillis(),
     val availableEmotions: List<EmotionSeed> = listOf(
         EmotionSeed("😊", "Vui"),
         EmotionSeed("😢", "Buồn"),
@@ -47,10 +52,12 @@ class JournalViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             try {
-                val diaries = journalRepository.getDiaries(childId)
+                val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                val formattedDate = sdf.format(Date(_uiState.value.selectedDateMillis))
+                val diaries = journalRepository.getDiaries(childId, formattedDate)
                 _uiState.update { state ->
                     state.copy(
-                        pastJournals = diaries.map { it.emotion_emoji },
+                        pastJournals = diaries,
                         isLoading = false
                     )
                 }
@@ -58,6 +65,11 @@ class JournalViewModel(
                 _uiState.update { it.copy(error = e.message, isLoading = false) }
             }
         }
+    }
+
+    fun onDateSelected(childId: Int, dateMillis: Long) {
+        _uiState.update { it.copy(selectedDateMillis = dateMillis) }
+        loadInitialData(childId)
     }
 
     fun onSeedDropped(emotion: EmotionSeed) {
@@ -92,14 +104,16 @@ class JournalViewModel(
                     plantState = "flower"
                 )
                 // Reload history
-                val diaries = journalRepository.getDiaries(childId)
+                val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                val formattedDate = sdf.format(Date(_uiState.value.selectedDateMillis))
+                val diaries = journalRepository.getDiaries(childId, formattedDate)
                 _uiState.update { state ->
                     state.copy(
                         phase = JournalPhase.PLANTING,
                         selectedEmotion = null,
                         isWatered = false,
                         isRecording = false,
-                        pastJournals = diaries.map { it.emotion_emoji },
+                        pastJournals = diaries,
                         isLoading = false
                     )
                 }

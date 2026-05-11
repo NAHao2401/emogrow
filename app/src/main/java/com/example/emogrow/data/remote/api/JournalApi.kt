@@ -16,6 +16,7 @@ interface JournalApi {
     @GET("api/children/{childId}/diaries")
     suspend fun getDiaries(
         @Header("Authorization") token: String,
-        @Path("childId") childId: Int
+        @Path("childId") childId: Int,
+        @Query("date") date: String? = null
     ): List<DiaryResponse>
 }

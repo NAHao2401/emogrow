@@ -30,7 +30,7 @@ class JournalRepository(
         )
     }
 
-    suspend fun getDiaries(childId: Int): List<DiaryResponse> {
-        return journalApi.getDiaries(getBearerToken(), childId)
+    suspend fun getDiaries(childId: Int, date: String? = null): List<DiaryResponse> {
+        return journalApi.getDiaries(getBearerToken(), childId, date)
     }
 }

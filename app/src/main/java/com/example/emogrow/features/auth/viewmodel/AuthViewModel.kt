@@ -17,6 +17,23 @@ class AuthViewModel(
     private val _uiState = MutableStateFlow(AuthUiState())
     val uiState: StateFlow<AuthUiState> = _uiState
 
+    fun checkAutoLogin() {
+        viewModelScope.launch {
+            _uiState.value = AuthUiState(
+                isCheckingAuth = true,
+                hasCheckedAuth = false
+            )
+
+            val isValidToken = repository.checkAutoLogin()
+
+            _uiState.value = AuthUiState(
+                isCheckingAuth = false,
+                hasCheckedAuth = true,
+                isAuthenticated = isValidToken
+            )
+        }
+    }
+
     fun login(email: String, password: String) {
         if (email.isBlank() || password.isBlank()) {
             _uiState.value = AuthUiState(errorMessage = "Please fill in all fields")
@@ -62,9 +79,25 @@ class AuthViewModel(
         }
     }
 
+    fun logout() {
+        viewModelScope.launch {
+            repository.logout()
+
+            _uiState.value = AuthUiState(
+                isAuthenticated = false,
+                isLoggedOut = true
+            )
+        }
+    }
+
     fun resetState() {
         _uiState.update {
-            it.copy(errorMessage = null)
+            it.copy(
+                isLoginSuccess = false,
+                isRegisterSuccess = false,
+                isLoggedOut = false,
+                errorMessage = null
+            )
         }
     }
 

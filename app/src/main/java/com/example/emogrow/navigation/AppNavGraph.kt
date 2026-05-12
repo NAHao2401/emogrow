@@ -1,5 +1,7 @@
 package com.example.emogrow.navigation
 
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -34,6 +36,7 @@ import com.example.emogrow.features.journal.ui.JournalScreen
 import com.example.emogrow.features.profile.ui.UserProfileScreen
 import com.example.emogrow.features.review.ui.ReviewScreen
 
+@RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun AppNavGraph(
     authFactory: AuthViewModelFactory,
@@ -365,7 +368,8 @@ fun AppNavGraph(
                 ) {
                     ChildProfileScreen(
                         childId = childId,
-                        viewModel = childViewModel,
+                        childViewModel = childViewModel,
+                        emotionViewModel = emotionViewModel,
                         onChangeChild = {
                             navController.navigate(Screen.ChildList.route) {
                                 popUpTo(Screen.Home.route) {
@@ -409,6 +413,11 @@ fun AppNavGraph(
                         .padding(paddingValues)
                 ) {
                     UserProfileScreen(
+                        authViewModel = authViewModel,
+                        childViewModel = childViewModel,
+                        onManageChildren = {
+                            navController.navigate(Screen.ChildList.route)
+                        },
                         onLogout = {
                             authViewModel.logout()
                         }

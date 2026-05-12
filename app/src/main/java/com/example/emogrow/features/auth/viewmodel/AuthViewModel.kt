@@ -34,6 +34,30 @@ class AuthViewModel(
         }
     }
 
+    fun loadCurrentUser() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                isLoading = true,
+                errorMessage = null
+            )
+
+            try {
+                val user = repository.getCurrentUser()
+
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    isAuthenticated = true,
+                    currentUser = user
+                )
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    errorMessage = ApiErrorParser.parse(e)
+                )
+            }
+        }
+    }
+
     fun login(email: String, password: String) {
         if (email.isBlank() || password.isBlank()) {
             _uiState.value = AuthUiState(errorMessage = "Please fill in all fields")

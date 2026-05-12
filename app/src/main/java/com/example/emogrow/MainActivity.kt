@@ -1,8 +1,10 @@
 package com.example.emogrow
 
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.annotation.RequiresApi
 import com.example.emogrow.data.local.TokenManager
 import com.example.emogrow.data.remote.api.RetrofitInstance
 import com.example.emogrow.data.repository.AuthRepository
@@ -15,6 +17,7 @@ import com.example.emogrow.navigation.AppNavGraph
 import com.example.emogrow.ui.theme.EmoGrowTheme
 
 class MainActivity : ComponentActivity() {
+    @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 

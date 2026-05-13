@@ -18,7 +18,7 @@ import com.example.emogrow.features.children.ui.ChildListScreen
 import com.example.emogrow.features.children.ui.CreateChildScreen
 import com.example.emogrow.features.children.viewmodel.ChildViewModel
 import com.example.emogrow.features.children.viewmodel.ChildViewModelFactory
-import com.example.emogrow.features.album.ui.AlbumScreen
+import com.example.emogrow.features.game.ui.MenuGameScreen
 import com.example.emogrow.features.game.ui.GameScreen
 import com.example.emogrow.features.game.ui.GameViewModel
 import com.example.emogrow.features.home.ui.HomeScreen
@@ -121,7 +121,7 @@ fun AppNavGraph(
         }
 
         composable(Screen.Album.route) {
-            AlbumScreen(
+            MenuGameScreen(
                 onLevelSelected = { levelId ->
                     navController.navigate(Screen.Game.createRoute(levelId))
                 },

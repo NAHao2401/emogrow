@@ -64,27 +64,50 @@ object GameDesign {
         EmotionType.WORRIED -> listOf(worriedStart, worriedEnd)
         EmotionType.SHY -> listOf(shyStart, shyEnd)
         EmotionType.PROUD -> listOf(proudStart, proudEnd)
+        EmotionType.LOVE -> listOf(shyStart, shyEnd)
+        EmotionType.CALM -> listOf(worriedStart, worriedEnd)
+        EmotionType.TIRED -> listOf(worriedStart, worriedEnd)
+        EmotionType.LONELY -> listOf(sadStart, sadEnd)
+        EmotionType.CONFUSED -> listOf(surprisedStart, surprisedEnd)
+        EmotionType.JEALOUS -> listOf(angryStart, angryEnd)
+        EmotionType.EXCITED -> listOf(happyStart, happyEnd)
     }
 
     fun partCardTint(emotion: EmotionType?) = when (emotion) {
         EmotionType.HAPPY -> happyTint
         EmotionType.SAD -> sadTint
         EmotionType.ANGRY -> angryTint
+        EmotionType.SURPRISED -> neutralTint
+        EmotionType.SCARED -> neutralTint
         EmotionType.WORRIED -> worriedTint
         EmotionType.SHY -> shyTint
         EmotionType.PROUD -> proudTint
+        EmotionType.LOVE -> shyTint
+        EmotionType.CALM -> neutralTint
+        EmotionType.TIRED -> worriedTint
+        EmotionType.LONELY -> sadTint
+        EmotionType.CONFUSED -> neutralTint
+        EmotionType.JEALOUS -> angryTint
+        EmotionType.EXCITED -> happyTint
         null -> neutralTint
-        else -> neutralTint
     }
 
     fun partCardBorder(emotion: EmotionType?) = when (emotion) {
         EmotionType.HAPPY -> happyBorder
         EmotionType.SAD -> sadBorder
         EmotionType.ANGRY -> angryBorder
+        EmotionType.SURPRISED -> neutralBorder
+        EmotionType.SCARED -> neutralBorder
         EmotionType.WORRIED -> worriedBorder
         EmotionType.SHY -> shyBorder
         EmotionType.PROUD -> proudBorder
+        EmotionType.LOVE -> shyBorder
+        EmotionType.CALM -> neutralBorder
+        EmotionType.TIRED -> worriedBorder
+        EmotionType.LONELY -> sadBorder
+        EmotionType.CONFUSED -> neutralBorder
+        EmotionType.JEALOUS -> angryBorder
+        EmotionType.EXCITED -> happyBorder
         null -> neutralBorder
-        else -> neutralBorder
     }
 }

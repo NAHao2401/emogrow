@@ -146,6 +146,9 @@ fun AppNavGraph(
                         albumManager.completeLevel(completedLevelId)
                         navController.popBackStack(Screen.Album.route, false)
                     }
+                },
+                onExit = {
+                    navController.popBackStack(Screen.Album.route, false)
                 }
             )
         }

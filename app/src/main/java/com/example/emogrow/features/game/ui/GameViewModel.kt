@@ -22,6 +22,8 @@ class GameViewModel : ViewModel() {
 
     private val snapThresholdPx = 80f * Resources.getSystem().displayMetrics.density
 
+    private val zoneCenters = mutableMapOf<ZoneId, Offset>()
+
     private val _uiState = MutableStateFlow(
         GameUiState(
             currentRound = sampleRounds[currentRoundIndex].copy(
@@ -42,6 +44,7 @@ class GameViewModel : ViewModel() {
         DropZone(ZoneId.MOUTH, PartType.MOUTH, offsetX = 0f, offsetY = 0.269f),
         DropZone(ZoneId.SWEAT, PartType.SWEAT, offsetX = 0.277f, offsetY = 0.019f)
     )
+    private val zoneAccepts = dropZones.associate { it.id to it.accepts }
 
     fun setEventListener(listener: GameEventListener?) {
         eventListener = listener
@@ -53,7 +56,11 @@ class GameViewModel : ViewModel() {
             return
         }
         currentRoundIndex = index
-        _uiState.value = GameUiState(currentRound = sampleRounds[currentRoundIndex])
+        _uiState.value = GameUiState(
+            currentRound = sampleRounds[currentRoundIndex].copy(
+                availableParts = sampleRounds[currentRoundIndex].availableParts.shuffled()
+            )
+        )
     }
 
     fun startDrag(part: FacePart) {
@@ -64,6 +71,17 @@ class GameViewModel : ViewModel() {
         _uiState.value = _uiState.value.copy(dragPosition = offset)
     }
 
+    fun cancelDrag() {
+        _uiState.value = _uiState.value.copy(
+            draggedPart = null,
+            dragPosition = Offset.Zero
+        )
+    }
+
+    fun updateZoneCenter(zoneId: ZoneId, center: Offset) {
+        zoneCenters[zoneId] = center
+    }
+
     fun tryDropPart(
         dropPosition: Offset,
         faceCanvasPosition: Offset,
@@ -72,36 +90,42 @@ class GameViewModel : ViewModel() {
         val state = _uiState.value
         val part = state.draggedPart ?: return
 
-        val center = Offset(
-            x = faceCanvasPosition.x + faceSize.width / 2f,
-            y = faceCanvasPosition.y + faceSize.height / 2f
-        )
-
         val activeZones = state.currentRound.targetFace.keys
-        val nearestZone = dropZones
-            .filter { zone -> activeZones.contains(zone.id) }
-            .map { zone ->
-                val zoneCenter = Offset(
-                    x = center.x + zone.offsetX * faceSize.width,
-                    y = center.y + zone.offsetY * faceSize.height
-                )
-                zone to dropPosition.getDistanceTo(zoneCenter)
-            }
-            .minByOrNull { it.second }
+        val nearestZone = if (zoneCenters.isNotEmpty()) {
+            zoneCenters
+                .filterKeys { zoneId -> activeZones.contains(zoneId) }
+                .map { entry -> entry.key to dropPosition.getDistanceTo(entry.value) }
+                .minByOrNull { it.second }
+        } else {
+            val center = Offset(
+                x = faceCanvasPosition.x + faceSize.width / 2f,
+                y = faceCanvasPosition.y + faceSize.height / 2f
+            )
+            dropZones
+                .filter { zone -> activeZones.contains(zone.id) }
+                .map { zone ->
+                    val zoneCenter = Offset(
+                        x = center.x + zone.offsetX * faceSize.width,
+                        y = center.y + zone.offsetY * faceSize.height
+                    )
+                    zone.id to dropPosition.getDistanceTo(zoneCenter)
+                }
+                .minByOrNull { it.second }
+        }
 
         // Neu tha gan vung hop le thi dat part, neu khong thi tra lai khay.
         // Kiem tra dung ben trai/phai cho cac zone co huong (mat, long may, ma).
         val isValidSidePlacement = nearestZone?.let { zone ->
-            isLeftRightCompatible(zone.first.id, part)
+            isLeftRightCompatible(zone.first, part)
         } ?: true
-        
+
         val canPlace = nearestZone != null &&
             nearestZone.second <= snapThresholdPx &&
-            nearestZone.first.accepts == part.type &&
+            zoneAccepts.getValue(nearestZone.first) == part.type &&
             isValidSidePlacement
 
         if (canPlace) {
-            val zoneId = nearestZone.first.id
+            val zoneId = nearestZone.first
             val updated = state.placedParts.toMutableMap()
             val previousPart = updated[zoneId]
             if (previousPart != null) {
@@ -171,58 +195,36 @@ class GameViewModel : ViewModel() {
     }
 
     private fun isLeftRightCompatible(zoneId: ZoneId, part: FacePart): Boolean {
-        val isLeftZone = zoneId == ZoneId.LEFT_EYE || zoneId == ZoneId.LEFT_EYEBROW || zoneId == ZoneId.LEFT_CHEEK
-        val isRightZone = zoneId == ZoneId.RIGHT_EYE || zoneId == ZoneId.RIGHT_EYEBROW || zoneId == ZoneId.RIGHT_CHEEK
-        if (!isLeftZone && !isRightZone) return true
+        val isLeftDirectionalZone = zoneId == ZoneId.LEFT_EYE || zoneId == ZoneId.LEFT_EYEBROW
+        val isRightDirectionalZone = zoneId == ZoneId.RIGHT_EYE || zoneId == ZoneId.RIGHT_EYEBROW
+        // Cheek zones are intentionally interchangeable.
+        if (!isLeftDirectionalZone && !isRightDirectionalZone) return true
 
         if (part.side != EyeSide.NONE) {
-            return if (isLeftZone) part.side == EyeSide.LEFT else part.side == EyeSide.RIGHT
+            return if (isLeftDirectionalZone) part.side == EyeSide.LEFT else part.side == EyeSide.RIGHT
         }
 
         val id = part.id.lowercase()
         val isLeftId = id.endsWith("_left")
         val isRightId = id.endsWith("_right")
         return when {
-            isLeftId -> isLeftZone
-            isRightId -> isRightZone
+            isLeftId -> isLeftDirectionalZone
+            isRightId -> isRightDirectionalZone
             else -> true
         }
     }
 
     companion object {
-        // ⚠️ Không dùng cùng nhau: mouth_worried + mouth_scared, eye_sad + eye_worried, eyebrows_scared + eyebrows_shy
-        private val CONFLICTING_GROUPS = listOf(
-            // Nhóm nghiêm trọng
-            setOf("mouth_frown", "mouth_scared"),
-            setOf("mouth_worried", "mouth_scared"),
-            setOf("mouth_proud", "mouth_smile"),
-            setOf("mouth_proud", "mouth_happy"),
-            setOf("eyebrows_scared_left", "eyebrows_shy_left"),
-            setOf("eyebrows_scared_right", "eyebrows_shy_right"),
-            // Nhóm cao
-            setOf("eye_sad", "eye_worried"),
-            setOf("eye_shy", "eye_sad"),
-            setOf("mouth_shy", "mouth_worried"),
-            setOf("eye_proud", "eye_happy")
-        )
 
-        private fun isConflicting(parts: List<FacePart>): Boolean {
-            val ids = parts.map { it.id.lowercase() }
-            return CONFLICTING_GROUPS.any { group ->
-                val matchedGroupIds = group.filter { groupId -> ids.any { partId -> matchesGroupId(groupId, partId) } }
-                matchedGroupIds.size >= 2
-            }
-        }
+
+
 
         private fun matchesGroupId(groupId: String, partId: String): Boolean {
             val baseId = partId.removeSuffix("_left").removeSuffix("_right")
             return groupId == partId || groupId == baseId
         }
 
-        private fun validatedParts(parts: List<FacePart>): List<FacePart> {
-            check(!isConflicting(parts)) { "Danh sach availableParts co cap xung dot" }
-            return parts
-        }
+
 
         val sampleRounds = listOf(
             GameRound(
@@ -235,7 +237,7 @@ class GameViewModel : ViewModel() {
                     ZoneId.NOSE to "nose_basic",
                     ZoneId.MOUTH to "mouth_smile"
                 ),
-                availableParts = validatedParts(listOf(
+                availableParts = listOf(
                     FacePart("eye_happy", PartType.EYE, EmotionType.HAPPY, "😊", "Mắt trái", EyeSide.LEFT),
                     FacePart("eye_happy", PartType.EYE, EmotionType.HAPPY, "😊", "Mắt phải", EyeSide.RIGHT),
                     FacePart("eye_sad", PartType.EYE, EmotionType.SAD, "😢", "Mắt trái", EyeSide.LEFT),
@@ -246,7 +248,7 @@ class GameViewModel : ViewModel() {
                     FacePart("mouth_smile", PartType.MOUTH, EmotionType.HAPPY, "😄", "Miệng"),
                     FacePart("mouth_frown", PartType.MOUTH, EmotionType.SAD, "😞", "Miệng"),
                     FacePart("mouth_angry", PartType.MOUTH, EmotionType.ANGRY, "😤", "Miệng")
-                )),
+                ),
                 isReview = false
             ),
             GameRound(
@@ -259,7 +261,7 @@ class GameViewModel : ViewModel() {
                     ZoneId.NOSE to "nose_basic",
                     ZoneId.MOUTH to "mouth_frown"
                 ),
-                availableParts = validatedParts(listOf(
+                availableParts = listOf(
                     FacePart("eye_sad", PartType.EYE, EmotionType.SAD, "😢", "Mắt trái", EyeSide.LEFT),
                     FacePart("eye_sad", PartType.EYE, EmotionType.SAD, "😢", "Mắt phải", EyeSide.RIGHT),
                     FacePart("eye_happy", PartType.EYE, EmotionType.HAPPY, "😊", "Mắt trái", EyeSide.LEFT),
@@ -270,7 +272,7 @@ class GameViewModel : ViewModel() {
                     FacePart("mouth_frown", PartType.MOUTH, EmotionType.SAD, "😞", "Miệng"),
                     FacePart("mouth_smile", PartType.MOUTH, EmotionType.HAPPY, "😄", "Miệng"),
                     FacePart("mouth_angry", PartType.MOUTH, EmotionType.ANGRY, "😤", "Miệng")
-                )),
+                ),
                 isReview = false
             ),
             GameRound(
@@ -283,7 +285,7 @@ class GameViewModel : ViewModel() {
                     ZoneId.NOSE to "nose_basic",
                     ZoneId.MOUTH to "mouth_angry"
                 ),
-                availableParts = validatedParts(listOf(
+                availableParts = listOf(
                     FacePart("eye_angry", PartType.EYE, EmotionType.ANGRY, "😠", "Mắt trái", EyeSide.LEFT),
                     FacePart("eye_angry", PartType.EYE, EmotionType.ANGRY, "😠", "Mắt phải", EyeSide.RIGHT),
                     FacePart("eye_happy", PartType.EYE, EmotionType.HAPPY, "😊", "Mắt trái", EyeSide.LEFT),
@@ -294,7 +296,7 @@ class GameViewModel : ViewModel() {
                     FacePart("mouth_angry", PartType.MOUTH, EmotionType.ANGRY, "😤", "Miệng"),
                     FacePart("mouth_smile", PartType.MOUTH, EmotionType.HAPPY, "😄", "Miệng"),
                     FacePart("mouth_frown", PartType.MOUTH, EmotionType.SAD, "😞", "Miệng")
-                )),
+                ),
                 isReview = false
             )
             ,
@@ -311,7 +313,7 @@ class GameViewModel : ViewModel() {
                     ZoneId.MOUTH to "mouth_scared",
                     ZoneId.SWEAT to "sweat"
                 ),
-                availableParts = validatedParts(listOf(
+                availableParts = listOf(
                     FacePart("eye_scared", PartType.EYE, EmotionType.SCARED, "😨", "Mắt trái", EyeSide.LEFT),
                     FacePart("eye_scared", PartType.EYE, EmotionType.SCARED, "😨", "Mắt phải", EyeSide.RIGHT),
                     FacePart("eyebrows_scared_left", PartType.EYEBROW, EmotionType.SCARED, "😨", "Lông mày trái"),
@@ -326,7 +328,7 @@ class GameViewModel : ViewModel() {
                     FacePart("eye_angry", PartType.EYE, EmotionType.ANGRY, "😠", "Mắt phải", EyeSide.RIGHT),
                     FacePart("mouth_smile", PartType.MOUTH, EmotionType.HAPPY, "😊", "Miệng"),
                     FacePart("mouth_angry", PartType.MOUTH, EmotionType.ANGRY, "😠", "Miệng")
-                )),
+                ),
                 isReview = false
             ),
             GameRound(
@@ -341,7 +343,7 @@ class GameViewModel : ViewModel() {
                     ZoneId.NOSE to "nose_basic",
                     ZoneId.MOUTH to "mouth_surprised"
                 ),
-                availableParts = validatedParts(listOf(
+                availableParts = listOf(
                     FacePart("eyebrows_scared_left", PartType.EYEBROW, EmotionType.SURPRISED, "😲", "Lông mày trái"),
                     FacePart("eyebrows_scared_right", PartType.EYEBROW, EmotionType.SURPRISED, "😲", "Lông mày phải"),
                     FacePart("eye_surprised_left", PartType.EYE, EmotionType.SURPRISED, "😲", "Mắt trái"),
@@ -355,7 +357,7 @@ class GameViewModel : ViewModel() {
                     FacePart("eye_angry_right", PartType.EYE, EmotionType.ANGRY, "😠", "Mắt phải"),
                     FacePart("mouth_smile", PartType.MOUTH, EmotionType.HAPPY, "😊", "Miệng"),
                     FacePart("mouth_angry", PartType.MOUTH, EmotionType.ANGRY, "😠", "Miệng")
-                )),
+                ),
                 isReview = false
             ),
             GameRound(
@@ -369,7 +371,7 @@ class GameViewModel : ViewModel() {
                     ZoneId.MOUTH to "mouth_worried",
                     ZoneId.SWEAT to "sweat"
                 ),
-                availableParts = validatedParts(listOf(
+                availableParts = listOf(
                     FacePart("eye_worried_left", PartType.EYE, EmotionType.WORRIED, "😟", "Mắt trái"),
                     FacePart("eye_worried_right", PartType.EYE, EmotionType.WORRIED, "😟", "Mắt phải"),
                     FacePart("nose_basic", PartType.NOSE, null, "👃", "Mũi"),
@@ -382,7 +384,7 @@ class GameViewModel : ViewModel() {
                     FacePart("eye_angry_right", PartType.EYE, EmotionType.ANGRY, "😠", "Mắt phải"),
                     FacePart("mouth_frown", PartType.MOUTH, EmotionType.SAD, "😞", "Miệng"),
                     FacePart("mouth_proud", PartType.MOUTH, EmotionType.PROUD, "😤", "Miệng")
-                )),
+                ),
                 isReview = false
             ),
             GameRound(
@@ -399,14 +401,15 @@ class GameViewModel : ViewModel() {
                     ZoneId.LEFT_CHEEK to "blush_shy",
                     ZoneId.RIGHT_CHEEK to "blush_shy"
                 ),
-                availableParts = validatedParts(listOf(
+                availableParts = listOf(
                     FacePart("eyebrows_shy_left", PartType.EYEBROW, EmotionType.SHY, "😳", "Lông mày trái"),
                     FacePart("eyebrows_shy_right", PartType.EYEBROW, EmotionType.SHY, "😳", "Lông mày phải"),
                     FacePart("eye_shy_left", PartType.EYE, EmotionType.SHY, "😳", "Mắt trái"),
                     FacePart("eye_shy_right", PartType.EYE, EmotionType.SHY, "😳", "Mắt phải"),
                     FacePart("nose_basic", PartType.NOSE, null, "👃", "Mũi"),
                     FacePart("mouth_shy", PartType.MOUTH, EmotionType.SHY, "😳", "Miệng"),
-                    FacePart("blush_shy", PartType.CHEEK, EmotionType.SHY, "😳", "Má"),
+                    FacePart("blush_shy", PartType.CHEEK, EmotionType.SHY, "😳", "Má", EyeSide.LEFT),
+                    FacePart("blush_shy", PartType.CHEEK, EmotionType.SHY, "😳", "Má", EyeSide.RIGHT),
                     // Distractor
                     FacePart("eye_happy_left", PartType.EYE, EmotionType.HAPPY, "😊", "Mắt trái"),
                     FacePart("eye_happy_right", PartType.EYE, EmotionType.HAPPY, "😊", "Mắt phải"),
@@ -414,7 +417,7 @@ class GameViewModel : ViewModel() {
                     FacePart("eye_surprised_right", PartType.EYE, EmotionType.SURPRISED, "😲", "Mắt phải"),
                     FacePart("mouth_frown", PartType.MOUTH, EmotionType.SAD, "😞", "Miệng"),
                     FacePart("mouth_proud", PartType.MOUTH, EmotionType.PROUD, "😤", "Miệng")
-                )),
+                ),
                 isReview = false
             ),
             GameRound(
@@ -429,12 +432,13 @@ class GameViewModel : ViewModel() {
                     ZoneId.NOSE to "nose_basic",
                     ZoneId.MOUTH to "mouth_proud"
                 ),
-                availableParts = validatedParts(listOf(
+                availableParts = listOf(
                     FacePart("eyebrows_shy_left", PartType.EYEBROW, EmotionType.PROUD, "😤", "Lông mày trái"),
                     FacePart("eyebrows_shy_right", PartType.EYEBROW, EmotionType.PROUD, "😤", "Lông mày phải"),
-                    FacePart("eye_proud", PartType.EYE, EmotionType.PROUD, "😤", "Mắt"),
+                    FacePart("eye_proud", PartType.EYE, EmotionType.PROUD, "😤", "Mắt", side = EyeSide.NONE),
                     FacePart("nose_basic", PartType.NOSE, null, "👃", "Mũi"),
                     FacePart("mouth_proud", PartType.MOUTH, EmotionType.PROUD, "😤", "Miệng"),
+                    FacePart("eye_proud", PartType.EYE, EmotionType.PROUD, "😤", "Mắt", side = EyeSide.NONE),
                     // Distractor
                     FacePart("eye_angry_left", PartType.EYE, EmotionType.ANGRY, "😠", "Mắt trái"),
                     FacePart("eye_angry_right", PartType.EYE, EmotionType.ANGRY, "😠", "Mắt phải"),
@@ -442,10 +446,231 @@ class GameViewModel : ViewModel() {
                     FacePart("eye_sad_right", PartType.EYE, EmotionType.SAD, "😢", "Mắt phải"),
                     FacePart("mouth_frown", PartType.MOUTH, EmotionType.SAD, "😞", "Miệng"),
                     FacePart("mouth_angry", PartType.MOUTH, EmotionType.ANGRY, "😠", "Miệng")
-                )),
+                ),
+                isReview = false
+            ),
+            GameRound(
+                emotion = EmotionType.LOVE,
+                promptText = "Ghép mặt YÊU THƯƠNG!",
+                promptEmoji = "🥰",
+                targetFace = mapOf(
+                    ZoneId.LEFT_EYE to "eye_love_left",
+                    ZoneId.RIGHT_EYE to "eye_love_right",
+                    ZoneId.LEFT_EYEBROW to "eyebrows_shy_left",
+                    ZoneId.RIGHT_EYEBROW to "eyebrows_shy_right",
+                    ZoneId.NOSE to "nose_basic",
+                    ZoneId.MOUTH to "mouth_shy",
+                    ZoneId.LEFT_CHEEK to "blush_shy",
+                    ZoneId.RIGHT_CHEEK to "blush_shy"
+                ),
+                availableParts = listOf(
+                    FacePart("eye_love_left", PartType.EYE, EmotionType.LOVE, "🥰", "Mắt trái", EyeSide.LEFT),
+                    FacePart("eye_love_right", PartType.EYE, EmotionType.LOVE, "🥰", "Mắt phải", EyeSide.RIGHT),
+                    FacePart("eyebrows_shy_left", PartType.EYEBROW, EmotionType.LOVE, "🥰", "Lông mày trái"),
+                    FacePart("eyebrows_shy_right", PartType.EYEBROW, EmotionType.LOVE, "🥰", "Lông mày phải"),
+                    FacePart("nose_basic", PartType.NOSE, null, "👃", "Mũi"),
+                    FacePart("mouth_shy", PartType.MOUTH, EmotionType.LOVE, "🥰", "Miệng"),
+                    FacePart("blush_shy", PartType.CHEEK, EmotionType.LOVE, "🥰", "Má trái", EyeSide.LEFT),
+                    FacePart("blush_shy", PartType.CHEEK, EmotionType.LOVE, "🥰", "Má phải", EyeSide.RIGHT),
+                            // Distractor
+                            FacePart("eye_sad_left", PartType.EYE, EmotionType.SAD, "😢", "Mắt trái"),
+                    FacePart("eye_worried_right", PartType.EYE, EmotionType.WORRIED, "😟", "Mắt phải"),
+                    FacePart("eye_worried_left", PartType.EYE, EmotionType.WORRIED, "😟", "Mắt trái"),
+                    FacePart("eye_sad_right", PartType.EYE, EmotionType.SAD, "😢", "Mắt phải"),
+                    FacePart("mouth_frown", PartType.MOUTH, EmotionType.SAD, "😞", "Miệng"),
+                    FacePart("mouth_angry", PartType.MOUTH, EmotionType.ANGRY, "😠", "Miệng")
+                ),
+                isReview = false
+            ),
+            GameRound(
+                emotion = EmotionType.CALM,
+                promptText = "Ghép mặt BÌNH TĨNH nhé!",
+                promptEmoji = "😌",
+                targetFace = mapOf(
+                    ZoneId.LEFT_EYE to "eye_calm_left",
+                    ZoneId.RIGHT_EYE to "eye_calm_right",
+                    ZoneId.LEFT_EYEBROW to "eyebrows_calm_left",
+                    ZoneId.RIGHT_EYEBROW to "eyebrows_calm_right",
+                    ZoneId.NOSE to "nose_basic",
+                    ZoneId.MOUTH to "mouth_calm"
+                ),
+                availableParts = listOf(
+                    FacePart("eye_calm_left", PartType.EYE, EmotionType.CALM, "😌", "Mắt trái", EyeSide.LEFT),
+                    FacePart("eye_calm_right", PartType.EYE, EmotionType.CALM, "😌", "Mắt phải", EyeSide.RIGHT),
+                    FacePart("eyebrows_calm_left", PartType.EYEBROW, EmotionType.CALM, "😌", "Lông mày trái"),
+                    FacePart("eyebrows_calm_right", PartType.EYEBROW, EmotionType.CALM, "😌", "Lông mày phải"),
+                    FacePart("nose_basic", PartType.NOSE, null, "👃", "Mũi"),
+                    FacePart("mouth_calm", PartType.MOUTH, EmotionType.CALM, "😌", "Miệng"),
+                            // Distractor
+                    FacePart("eye_scared", PartType.EYE, EmotionType.SCARED, "😨", "Mắt trái", EyeSide.LEFT),
+                    FacePart("eye_scared", PartType.EYE, EmotionType.SCARED, "😨", "Mắt phải", EyeSide.RIGHT),
+                            FacePart("eye_sad_left", PartType.EYE, EmotionType.SAD, "😢", "Mắt trái"),
+                    FacePart("eye_sad_right", PartType.EYE, EmotionType.SAD, "😢", "Mắt phải"),
+                    FacePart("mouth_frown", PartType.MOUTH, EmotionType.SAD, "😞", "Miệng"),
+                    FacePart("mouth_angry", PartType.MOUTH, EmotionType.ANGRY, "😠", "Miệng") ,
+                    FacePart("nose_water", PartType.NOSE, null, "💧", "Mũi")
+            ),
+                isReview = false
+            ),
+            GameRound(
+                emotion = EmotionType.TIRED,
+                promptText = "Ghép mặt MỆT MỎI nhé!",
+                promptEmoji = "😫",
+                targetFace = mapOf(
+                    ZoneId.LEFT_EYE to "eye_tired_left",
+                    ZoneId.RIGHT_EYE to "eye_tired_right",
+                    ZoneId.LEFT_EYEBROW to "eyebrows_tired_left",
+                    ZoneId.RIGHT_EYEBROW to "eyebrows_tired_right",
+                    ZoneId.NOSE to "nose_basic",
+                    ZoneId.MOUTH to "mouth_tired"
+                ),
+                availableParts = listOf(
+                    FacePart("eye_tired_left", PartType.EYE, EmotionType.TIRED, "😫", "Mắt trái", EyeSide.LEFT),
+                    FacePart("eye_tired_right", PartType.EYE, EmotionType.TIRED, "😫", "Mắt phải", EyeSide.RIGHT),
+                    FacePart("eyebrows_tired_left", PartType.EYEBROW, EmotionType.TIRED, "😫", "Lông mày trái"),
+                    FacePart("eyebrows_tired_right", PartType.EYEBROW, EmotionType.TIRED, "😫", "Lông mày phải"),
+                    FacePart("nose_basic", PartType.NOSE, null, "👃", "Mũi"),
+                    FacePart("mouth_tired", PartType.MOUTH, EmotionType.TIRED, "😫", "Miệng"),
+                    // Distractor
+                    FacePart("eye_scared", PartType.EYE, EmotionType.SCARED, "😨", "Mắt trái", EyeSide.LEFT),
+                    FacePart("eye_scared", PartType.EYE, EmotionType.SCARED, "😨", "Mắt phải", EyeSide.RIGHT),
+                    FacePart("eye_happy_left", PartType.EYE, EmotionType.HAPPY, "😊", "Mắt trái"),
+                    FacePart("eye_happy_right", PartType.EYE, EmotionType.HAPPY, "😊", "Mắt phải"),
+                    FacePart("mouth_happy", PartType.MOUTH, EmotionType.HAPPY, "😄", "Miệng"),
+                    FacePart("mouth_scared", PartType.MOUTH, EmotionType.SCARED, "😨", "Miệng"),
+                    FacePart("nose_water", PartType.NOSE, null, "💧", "Mũi"),
+
+                    ),
+                isReview = false
+            ),
+            GameRound(
+                emotion = EmotionType.LONELY,
+                promptText = "Ghép mặt CÔ ĐƠN nhé!",
+                promptEmoji = "😔",
+                targetFace = mapOf(
+                    ZoneId.LEFT_EYE to "eye_lonely_left",
+                    ZoneId.RIGHT_EYE to "eye_lonely_right",
+                    ZoneId.LEFT_EYEBROW to "eyebrows_calm_left",
+                    ZoneId.RIGHT_EYEBROW to "eyebrows_calm_right",
+                    ZoneId.NOSE to "nose_water",
+                    ZoneId.MOUTH to "mouth_worried"
+                ),
+                availableParts = listOf(
+                    FacePart("eye_lonely_left", PartType.EYE, EmotionType.LONELY, "😔", "Mắt trái", EyeSide.LEFT),
+                    FacePart("eye_lonely_right", PartType.EYE, EmotionType.LONELY, "😔", "Mắt phải", EyeSide.RIGHT),
+                    FacePart("eyebrows_calm_left", PartType.EYEBROW, EmotionType.LONELY, "😔", "Lông mày trái"),
+                    FacePart("eyebrows_calm_right", PartType.EYEBROW, EmotionType.LONELY, "😔", "Lông mày phải"),
+                    FacePart("nose_water", PartType.NOSE, null, "💧", "Mũi"),
+                    FacePart("mouth_worried", PartType.MOUTH, EmotionType.LONELY, "😔", "Miệng"),
+                    // Distractor
+                    FacePart("eye_scared", PartType.EYE, EmotionType.SCARED, "😨", "Mắt trái", EyeSide.LEFT),
+                    FacePart("eye_scared", PartType.EYE, EmotionType.SCARED, "😨", "Mắt phải", EyeSide.RIGHT),
+                    FacePart("eye_happy_left", PartType.EYE, EmotionType.HAPPY, "😊", "Mắt trái"),
+                    FacePart("eye_happy_right", PartType.EYE, EmotionType.HAPPY, "😊", "Mắt phải"),
+                    FacePart("mouth_surprised", PartType.MOUTH, EmotionType.SURPRISED, "😲", "Miệng"),
+                    FacePart("mouth_proud", PartType.MOUTH, EmotionType.PROUD, "😤", "Miệng"),
+                    FacePart("nose_water", PartType.NOSE, null, "💧", "Mũi"),
+
+                    ),
+                isReview = false
+            ),
+            GameRound(
+                emotion = EmotionType.CONFUSED,
+                promptText = "Ghép mặt BỐI RỐI nhé!",
+                promptEmoji = "😵‍💫",
+                targetFace = mapOf(
+                    ZoneId.LEFT_EYE to "eye_confused",
+                    ZoneId.RIGHT_EYE to "eye_confused",
+                    ZoneId.LEFT_EYEBROW to "eyebrows_confused_left",
+                    ZoneId.RIGHT_EYEBROW to "eyebrows_confused_right",
+                    ZoneId.NOSE to "nose_basic",
+                    ZoneId.MOUTH to "mouth_confused"
+                ),
+                availableParts = listOf(
+                    FacePart("eye_confused", PartType.EYE, EmotionType.CONFUSED, "😵‍💫", "Mắt trái", EyeSide.LEFT),
+                    FacePart("eye_confused", PartType.EYE, EmotionType.CONFUSED, "😵‍💫", "Mắt phải", EyeSide.RIGHT),
+                    FacePart("eyebrows_confused_left", PartType.EYEBROW, EmotionType.CONFUSED, "😵‍💫", "Lông mày trái"),
+                    FacePart("eyebrows_confused_right", PartType.EYEBROW, EmotionType.CONFUSED, "😵‍💫", "Lông mày phải"),
+                    FacePart("nose_basic", PartType.NOSE, null, "👃", "Mũi"),
+                    FacePart("mouth_confused", PartType.MOUTH, EmotionType.CONFUSED, "😵‍💫", "Miệng"),
+                    // Distractor
+                    FacePart("eye_lonely_left", PartType.EYE, EmotionType.SCARED, "😨", "Mắt trái", EyeSide.LEFT),
+                    FacePart("eye_lonely_right", PartType.EYE, EmotionType.SCARED, "😨", "Mắt phải", EyeSide.RIGHT),
+                    FacePart("eye_love_left", PartType.EYE, EmotionType.HAPPY, "😊", "Mắt trái"),
+                    FacePart("eye_love_right", PartType.EYE, EmotionType.HAPPY, "😊", "Mắt phải"),
+                    FacePart("mouth_surprised", PartType.MOUTH, EmotionType.SURPRISED, "😲", "Miệng"),
+                    FacePart("mouth_scared", PartType.MOUTH, EmotionType.SCARED, "😨", "Miệng"),
+                    FacePart("nose_water", PartType.NOSE, null, "💧", "Mũi"),
+
+                    ),
+                isReview = false
+            ),
+            GameRound(
+                emotion = EmotionType.JEALOUS,
+                promptText = "Ghép mặt GHEN TỊ nhé!",
+                promptEmoji = "😒",
+                targetFace = mapOf(
+                    ZoneId.LEFT_EYE to "part_jealous_left_eye",
+                    ZoneId.RIGHT_EYE to "part_jealous_right_eye",
+                    ZoneId.NOSE to "part_nose_normal",
+                    ZoneId.MOUTH to "part_jealous_mouth",
+                    ZoneId.LEFT_EYEBROW to "part_eyebrows_shy_left",
+                    ZoneId.RIGHT_EYEBROW to "part_eyebrows_shy_right"
+                ),
+                availableParts = listOf(
+                    FacePart("part_jealous_left_eye", PartType.EYE, EmotionType.JEALOUS, "😒", "Mắt trái", EyeSide.LEFT),
+                    FacePart("part_jealous_right_eye", PartType.EYE, EmotionType.JEALOUS, "😒", "Mắt phải", EyeSide.RIGHT),
+                    FacePart("part_eyebrows_shy_left", PartType.EYEBROW, EmotionType.JEALOUS, "😒", "Lông mày trái"),
+                    FacePart("part_eyebrows_shy_right", PartType.EYEBROW, EmotionType.JEALOUS, "😒", "Lông mày phải"),
+                    FacePart("part_nose_normal", PartType.NOSE, null, "👃", "Mũi"),
+                    FacePart("part_jealous_mouth", PartType.MOUTH, EmotionType.JEALOUS, "😒", "Miệng"),
+                    // Distractor
+                    FacePart("eye_angry_left", PartType.EYE, EmotionType.ANGRY, "😠", "Mắt trái", EyeSide.LEFT),
+                    FacePart("eye_angry_right", PartType.EYE, EmotionType.ANGRY, "😠", "Mắt phải", EyeSide.RIGHT),
+                    FacePart("eye_sad_left", PartType.EYE, EmotionType.SAD, "😢", "Mắt trái", EyeSide.LEFT),
+                    FacePart("eye_sad_right", PartType.EYE, EmotionType.SAD, "😢", "Mắt phải", EyeSide.RIGHT),
+                    FacePart("mouth_angry", PartType.MOUTH, EmotionType.ANGRY, "😠", "Miệng"),
+                    FacePart("mouth_frown", PartType.MOUTH, EmotionType.SAD, "😞", "Miệng"),
+                    FacePart("nose_water", PartType.NOSE, null, "💧", "Mũi")
+
+                    ),
+                isReview = false
+            ),
+            GameRound(
+                emotion = EmotionType.EXCITED,
+                promptText = "Ghép mặt PHẤN KHÍCH nhé!",
+                promptEmoji = "🤩",
+                targetFace = mapOf(
+                    ZoneId.LEFT_EYE to "part_excited_left_eye",
+                    ZoneId.RIGHT_EYE to "part_excited_right_eye",
+                    ZoneId.NOSE to "part_nose_normal",
+                    ZoneId.MOUTH to "part_excited_mouth",
+                    ZoneId.LEFT_EYEBROW to "part_eyebrows_shy_left",
+                    ZoneId.RIGHT_EYEBROW to "part_eyebrows_shy_right",
+                    ZoneId.LEFT_CHEEK to "part_blush_excited",
+                    ZoneId.RIGHT_CHEEK to "part_blush_excited"
+                ),
+                availableParts = listOf(
+                    FacePart("part_excited_left_eye", PartType.EYE, EmotionType.EXCITED, "🤩", "Mắt trái", EyeSide.LEFT),
+                    FacePart("part_excited_right_eye", PartType.EYE, EmotionType.EXCITED, "🤩", "Mắt phải", EyeSide.RIGHT),
+                    FacePart("part_eyebrows_shy_left", PartType.EYEBROW, EmotionType.EXCITED, "🤩", "Lông mày trái"),
+                    FacePart("part_eyebrows_shy_right", PartType.EYEBROW, EmotionType.EXCITED, "🤩", "Lông mày phải"),
+                    FacePart("part_nose_normal", PartType.NOSE, null, "👃", "Mũi"),
+                    FacePart("part_excited_mouth", PartType.MOUTH, EmotionType.EXCITED, "🤩", "Miệng"),
+                    FacePart("part_blush_excited", PartType.CHEEK, EmotionType.EXCITED, "🤩", "Má trái", EyeSide.LEFT),
+                    FacePart("part_blush_excited", PartType.CHEEK, EmotionType.EXCITED, "🤩", "Má phải", EyeSide.RIGHT),
+                    // Distractor
+                    FacePart("eye_happy_left", PartType.EYE, EmotionType.HAPPY, "😊", "Mắt trái", EyeSide.LEFT),
+                    FacePart("eye_happy_right", PartType.EYE, EmotionType.HAPPY, "😊", "Mắt phải", EyeSide.RIGHT),
+                    FacePart("eye_love_left", PartType.EYE, EmotionType.LOVE, "🥰", "Mắt trái", EyeSide.LEFT),
+                    FacePart("eye_love_right", PartType.EYE, EmotionType.LOVE, "🥰", "Mắt phải", EyeSide.RIGHT),
+                    FacePart("mouth_worried", PartType.MOUTH, EmotionType.HAPPY, "😄", "Miệng"),
+                    FacePart("mouth_shy", PartType.MOUTH, EmotionType.SHY, "😳", "Miệng"),
+                    FacePart("nose_water", PartType.NOSE, null, "💧", "Mũi")
+
+                    ),
                 isReview = false
             )
         )
     }
 }
-

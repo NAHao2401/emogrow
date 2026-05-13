@@ -1,8 +1,12 @@
 package com.example.emogrow.features.game.ui
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -30,26 +34,36 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.consumePositionChange
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import kotlin.math.abs
+import kotlin.math.sqrt
 
 @Composable
 fun DraggablePart(
     part: FacePart,
     isPlaced: Boolean,
-    onDragStart: (Offset) -> Unit,
-    onDragUpdate: (Offset) -> Unit,
-    onDragEnd: (Offset) -> Unit
+    onDragStart: (FacePart, Offset) -> Unit,
+    onDragMove: (Offset) -> Unit,
+    onDragEnd: () -> Unit,
+    onDragCancel: () -> Unit
 ) {
     var cardTopLeft by remember { mutableStateOf(Offset.Zero) }
-    var currentPointer by remember { mutableStateOf(Offset.Zero) }
     var dragging by remember { mutableStateOf(false) }
     val rotation = remember { Animatable(0f) }
+    var isPressed by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 1.08f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "press_scale"
+    )
+    val dragThreshold = with(LocalDensity.current) { 8.dp.toPx() }
 
     LaunchedEffect(part.id) {
         // Lắc nhẹ khi xuất hiện để bé chú ý đến các lựa chọn mới.
@@ -71,30 +85,55 @@ fun DraggablePart(
             .graphicsLayer {
                 rotationZ = rotation.value
                 alpha = if (dragging || isPlaced) 0.3f else 1f
+                scaleX = scale
+                scaleY = scale
             }
-            .pointerInput(part.id, isPlaced) {
+            .pointerInput(part, isPlaced) {
                 if (isPlaced) return@pointerInput
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    isPressed = true
 
-                detectDragGesturesAfterLongPress(
-                    onDragStart = { offset ->
-                        dragging = true
-                        currentPointer = cardTopLeft + offset
-                        onDragStart(currentPointer)
-                    },
-                    onDrag = { change, dragAmount ->
-                        change.consume()
-                        currentPointer = currentPointer + dragAmount
-                        onDragUpdate(currentPointer)
-                    },
-                    onDragEnd = {
-                        dragging = false
-                        onDragEnd(currentPointer)
-                    },
-                    onDragCancel = {
-                        dragging = false
-                        onDragEnd(currentPointer)
+                    var dragStarted = false
+                    var scrollDecided = false
+
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val change = event.changes.firstOrNull() ?: break
+
+                        if (!change.pressed) break
+
+                        val totalDx = change.position.x - down.position.x
+                        val totalDy = change.position.y - down.position.y
+                        val distance = sqrt(totalDx * totalDx + totalDy * totalDy)
+
+                        if (!scrollDecided && distance > dragThreshold) {
+                            scrollDecided = true
+                            val isHorizontalScroll = abs(totalDx) > abs(totalDy) * 1.5f
+
+                            if (isHorizontalScroll) {
+                                break
+                            } else {
+                                change.consumePositionChange()
+                                dragStarted = true
+                                dragging = true
+                                onDragStart(part, cardTopLeft + change.position)
+                            }
+                        }
+
+                        if (dragStarted) {
+                            change.consumePositionChange()
+                            onDragMove(cardTopLeft + change.position)
+                        }
                     }
-                )
+
+                    isPressed = false
+
+                    if (dragStarted) {
+                        dragging = false
+                        onDragEnd()
+                    }
+                }
             }
     ) {
         Box(

@@ -34,9 +34,11 @@ import androidx.compose.foundation.layout.Row
 fun PartsTray(
     availableParts: List<FacePart>,
     placedPartIds: Set<String>,
+    isDragging: Boolean,
     onDragStart: (FacePart, Offset) -> Unit,
-    onDragUpdate: (Offset) -> Unit,
-    onDragEnd: (Offset) -> Unit,
+    onDragMove: (Offset) -> Unit,
+    onDragEnd: () -> Unit,
+    onDragCancel: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val shape = RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp)
@@ -73,7 +75,8 @@ fun PartsTray(
                     .fillMaxWidth()
                     .padding(top = 4.dp, bottom = 8.dp),
                 contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                userScrollEnabled = !isDragging
             ) {
                 items(columns.size) { index ->
                     val topPart = columns[index].first()
@@ -83,23 +86,25 @@ fun PartsTray(
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        val topPlaced = placedPartIds.contains(topPart.id)
+                        val topPlaced = placedPartIds.contains(topPart.uniqueKey)
                         DraggablePart(
                             part = topPart,
                             isPlaced = topPlaced,
-                            onDragStart = { offset -> onDragStart(topPart, offset) },
-                            onDragUpdate = onDragUpdate,
-                            onDragEnd = onDragEnd
+                            onDragStart = onDragStart,
+                            onDragMove = onDragMove,
+                            onDragEnd = onDragEnd,
+                            onDragCancel = onDragCancel
                         )
 
                         if (bottomPart != null) {
-                            val bottomPlaced = placedPartIds.contains(bottomPart.id)
+                            val bottomPlaced = placedPartIds.contains(bottomPart.uniqueKey)
                             DraggablePart(
                                 part = bottomPart,
                                 isPlaced = bottomPlaced,
-                                onDragStart = { offset -> onDragStart(bottomPart, offset) },
-                                onDragUpdate = onDragUpdate,
-                                onDragEnd = onDragEnd
+                                onDragStart = onDragStart,
+                                onDragMove = onDragMove,
+                                onDragEnd = onDragEnd,
+                                onDragCancel = onDragCancel
                             )
                         } else {
                             Spacer(modifier = Modifier.height(96.dp))

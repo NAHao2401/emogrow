@@ -3,7 +3,6 @@ package com.example.emogrow.features.game.ui
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -56,32 +55,40 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.border
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 import kotlin.random.Random
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.activity.compose.BackHandler
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 
 @Composable
 fun GameScreen(
     viewModel: GameViewModel,
     levelId: Int,
     onFaceCompleted: (EmotionType, Boolean) -> Unit,
-    onLevelCompleted: (Int) -> Unit
+    onLevelCompleted: (Int) -> Unit,
+    onExit: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
     var faceCanvasPosition by remember { mutableStateOf(Offset.Zero) }
     var faceCanvasSize by remember { mutableStateOf(Size.Zero) }
+    var showExitDialog by remember { mutableStateOf(false) }
 
-    val requiredCounts = remember(uiState.currentRound) {
-        uiState.currentRound.targetFace.values.groupingBy { it }.eachCount()
-    }
-    val placedPartIds = remember(uiState.placedParts, requiredCounts) {
-        // Check if all required base IDs are satisfied by counting placed parts with each base ID
-        val placedBaseCounts = uiState.placedParts.values
+    val placedPartKeys = remember(uiState.placedParts) {
+        uiState.placedParts.values
             .filterNotNull()
-            .groupingBy { it.id }
-            .eachCount()
-        requiredCounts.keys.filter { id -> (placedBaseCounts[id] ?: 0) >= (requiredCounts[id] ?: 0) }.toSet()
+            .map { it.uniqueKey }
+            .toSet()
     }
 
     var confettiKey by remember { mutableStateOf(0) }
@@ -103,6 +110,12 @@ fun GameScreen(
             showConfetti = true
             onFaceCompleted(uiState.currentRound.emotion, uiState.currentRound.isReview)
         }
+    }
+
+    if (showExitDialog) {
+        BackHandler { showExitDialog = false }
+    } else {
+        BackHandler { showExitDialog = true }
     }
 
     Box(
@@ -144,7 +157,9 @@ fun GameScreen(
                         draggedPart = uiState.draggedPart,
                         dragPosition = uiState.dragPosition,
                         requiredZones = uiState.currentRound.targetFace.keys,
-                        onZonePositioned = { _, _ -> },
+                        onZonePositioned = { zoneId, center ->
+                            viewModel.updateZoneCenter(zoneId, center)
+                        },
                         onPlacedPartTap = { zoneId ->
                             viewModel.removePart(zoneId)
                         }
@@ -154,20 +169,24 @@ fun GameScreen(
 
             PartsTray(
                 availableParts = uiState.currentRound.availableParts,
-                placedPartIds = placedPartIds,
+                placedPartIds = placedPartKeys,
+                isDragging = uiState.draggedPart != null,
                 onDragStart = { part, position ->
                     viewModel.startDrag(part)
                     viewModel.updateDragPosition(position)
                 },
-                onDragUpdate = { position ->
+                onDragMove = { position ->
                     viewModel.updateDragPosition(position)
                 },
-                onDragEnd = { position ->
+                onDragEnd = {
                     viewModel.tryDropPart(
-                        dropPosition = position,
+                        dropPosition = uiState.dragPosition,
                         faceCanvasPosition = faceCanvasPosition,
                         faceSize = faceCanvasSize
                     )
+                },
+                onDragCancel = {
+                    viewModel.cancelDrag()
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -199,6 +218,38 @@ fun GameScreen(
                 }
             )
         }
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(8.dp)
+                .size(44.dp)
+                .shadow(elevation = 10.dp, shape = CircleShape)
+                .border(width = 2.dp, color = Color.Black, shape = CircleShape)
+                .background(color = Color.White.copy(alpha = 0.95f), shape = CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            IconButton(
+                onClick = { showExitDialog = true },
+                modifier = Modifier.fillMaxSize()
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Quay lai",
+                    tint = Color(0xFF2D2D2D)
+                )
+            }
+        }
+
+        if (showExitDialog) {
+            ConfirmExitDialog(
+                onConfirmExit = {
+                    showExitDialog = false
+                    onExit()
+                },
+                onDismiss = { showExitDialog = false }
+            )
+        }
     }
 }
 
@@ -208,6 +259,16 @@ private fun stickerResNameForEmotion(emotion: EmotionType): String = when (emoti
     EmotionType.ANGRY -> "part_mouth_angry"
     EmotionType.SURPRISED -> "part_eye_happy_left"
     EmotionType.SCARED -> "part_eye_sad_left"
+    EmotionType.WORRIED -> "part_eye_worried_left"
+    EmotionType.SHY -> "part_eye_shy_left"
+    EmotionType.PROUD -> "part_eye_proud"
+    EmotionType.LOVE -> "part_love_left_eye"
+    EmotionType.CALM -> "part_calm_left_eye"
+    EmotionType.TIRED -> "part_tired_left_eye"
+    EmotionType.LONELY -> "part_lonely_left_eye"
+    EmotionType.CONFUSED -> "part_confused_eye"
+    EmotionType.JEALOUS -> "part_jealous_left_eye"
+    EmotionType.EXCITED -> "part_excited_left_eye"
 }
 
 @Composable
@@ -523,5 +584,48 @@ private fun DragOverlay(
     }
 }
 
+@Composable
+private fun ConfirmExitDialog(
+    onConfirmExit: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "Bạn có chắc chắn muốn quay lại?",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirmExit,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Check,
+                    contentDescription = null,
+                    tint = Color.White
+                )
 
+            }
+        },
+        dismissButton = {
+            Button(
+                onClick = onDismiss,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828))
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Close,
+                    contentDescription = null,
+                    tint = Color.White
+                )
 
+            }
+        }
+    )
+}

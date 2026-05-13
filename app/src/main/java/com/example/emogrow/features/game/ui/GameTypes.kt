@@ -4,7 +4,23 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-enum class EmotionType { HAPPY, SAD, ANGRY, SURPRISED, SCARED, WORRIED, SHY, PROUD }
+enum class EmotionType {
+    HAPPY,
+    SAD,
+    ANGRY,
+    SURPRISED,
+    SCARED,
+    WORRIED,
+    SHY,
+    PROUD,
+    LOVE,
+    CALM,
+    TIRED,
+    LONELY,
+    CONFUSED,
+    JEALOUS,
+    EXCITED
+}
 
 enum class ZoneId {
     LEFT_EYE,
@@ -30,8 +46,9 @@ data class FacePart(
     val label: String,
     val side: EyeSide = EyeSide.NONE
 ) {
-    // Unique key for tracking placed parts considering eye side
-    val uniqueKey: String get() = if (side != EyeSide.NONE) "$id-${side.name}" else id
+    // Directional parts keep side-based key; neutral duplicates need per-instance key.
+    val uniqueKey: String
+        get() = if (side != EyeSide.NONE) "$id-${side.name}" else "$id-${System.identityHashCode(this)}"
 }
 
 data class DropZone(
@@ -77,4 +94,3 @@ object GameTheme {
     val labelTextSize = 10.sp
     val emojiDisplaySize = 48.sp
 }
-

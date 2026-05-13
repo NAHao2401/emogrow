@@ -212,6 +212,13 @@ private fun hoverColor(emotion: EmotionType?): Color = when (emotion) {
     EmotionType.WORRIED -> Color(0xFF636E72)
     EmotionType.SHY -> Color(0xFFF368E0)
     EmotionType.PROUD -> Color(0xFFFFD32A)
+    EmotionType.LOVE -> Color(0xFFFF6B9E)
+    EmotionType.CALM -> Color(0xFF3AAED8)
+    EmotionType.TIRED -> Color(0xFF7C73E6)
+    EmotionType.LONELY -> Color(0xFF627D98)
+    EmotionType.CONFUSED -> Color(0xFFF59E0B)
+    EmotionType.JEALOUS -> Color(0xFFD63031)
+    EmotionType.EXCITED -> Color(0xFFFF9500)
     null -> Color(0xFFE8C97A)
 }
 
@@ -220,6 +227,7 @@ private fun Offset.getDistanceTo(other: Offset): Float {
     val dy = y - other.y
     return kotlin.math.sqrt(dx * dx + dy * dy)
 }
+
 
 
 

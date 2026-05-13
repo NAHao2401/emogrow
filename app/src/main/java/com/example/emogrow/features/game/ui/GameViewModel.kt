@@ -1,12 +1,16 @@
 package com.example.emogrow.features.game.ui
 
+import android.app.Application
 import android.content.res.Resources
+import android.speech.tts.TextToSpeech
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import java.util.Locale
 
 data class GameUiState(
     val currentRound: GameRound,
@@ -16,7 +20,7 @@ data class GameUiState(
     val dragPosition: Offset = Offset.Zero
 )
 
-class GameViewModel : ViewModel() {
+class GameViewModel(application: Application) : AndroidViewModel(application) {
     private var currentRoundIndex = 0
     private var eventListener: GameEventListener? = null
 
@@ -45,6 +49,45 @@ class GameViewModel : ViewModel() {
         DropZone(ZoneId.SWEAT, PartType.SWEAT, offsetX = 0.277f, offsetY = 0.019f)
     )
     private val zoneAccepts = dropZones.associate { it.id to it.accepts }
+
+    private val _replayCount = MutableStateFlow(0)
+    val replayCount: StateFlow<Int> = _replayCount.asStateFlow()
+
+    // TTS
+    private var tts: TextToSpeech? = null
+    private var isTtsReady = false
+    private var pendingIntroEmotion: EmotionType? = null
+
+    init {
+        // Khởi tạo TTS để đọc hướng dẫn bằng tiếng Việt.
+        tts = TextToSpeech(application) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                val viVnLocale = Locale.forLanguageTag("vi-VN")
+                val viLocale = Locale("vi")
+                val primaryResult = tts?.setLanguage(viVnLocale) ?: TextToSpeech.LANG_NOT_SUPPORTED
+                val resolvedResult = if (
+                    primaryResult == TextToSpeech.LANG_MISSING_DATA ||
+                    primaryResult == TextToSpeech.LANG_NOT_SUPPORTED
+                ) {
+                    tts?.setLanguage(viLocale) ?: TextToSpeech.LANG_NOT_SUPPORTED
+                } else {
+                    primaryResult
+                }
+
+                isTtsReady = resolvedResult != TextToSpeech.LANG_MISSING_DATA &&
+                    resolvedResult != TextToSpeech.LANG_NOT_SUPPORTED
+                if (isTtsReady) {
+                    tts?.setSpeechRate(1.15f)
+                    tts?.setPitch(1.5f)
+                    // Đọc tự động nếu trước đó đã yêu cầu mà TTS chưa sẵn sàng.
+                    pendingIntroEmotion?.let { emotion ->
+                        pendingIntroEmotion = null
+                        speakRoundIntro(emotion)
+                    }
+                }
+            }
+        }
+    }
 
     fun setEventListener(listener: GameEventListener?) {
         eventListener = listener
@@ -167,6 +210,17 @@ class GameViewModel : ViewModel() {
         eventListener?.onReadyForNextRound()
     }
 
+    fun replayCurrentRound() {
+        val state = _uiState.value
+        _uiState.value = state.copy(
+            placedParts = ZoneId.entries.associateWith { null },
+            isCompleted = false,
+            draggedPart = null,
+            dragPosition = Offset.Zero
+        )
+        _replayCount.update { it + 1 }
+    }
+
     fun nextRound() {
         goToNextRound()
     }
@@ -212,6 +266,49 @@ class GameViewModel : ViewModel() {
             isRightId -> isRightDirectionalZone
             else -> true
         }
+    }
+
+    // Đọc to hướng dẫn mỗi khi bắt đầu màn chơi.
+    fun speakRoundIntro(emotion: EmotionType) {
+        if (!isTtsReady) {
+            pendingIntroEmotion = emotion
+            return
+        }
+        val text = buildIntroText(emotion)
+        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "round_intro")
+    }
+
+    fun stopSpeaking() {
+        // Dừng giọng đọc ngay khi người dùng thoát màn chơi.
+        tts?.stop()
+    }
+
+    private fun buildIntroText(emotion: EmotionType): String {
+        val emotionName = when (emotion) {
+            EmotionType.HAPPY -> "vui vẻ"
+            EmotionType.SAD -> "buồn bã"
+            EmotionType.ANGRY -> "tức giận"
+            EmotionType.SURPRISED -> "bất ngờ"
+            EmotionType.SCARED -> "sợ hãi"
+            EmotionType.WORRIED -> "lo lắng"
+            EmotionType.SHY -> "xấu hổ"
+            EmotionType.PROUD -> "tự hào"
+            EmotionType.LOVE -> "yêu thương"
+            EmotionType.CALM -> "bình tĩnh"
+            EmotionType.TIRED -> "mệt mỏi"
+            EmotionType.LONELY -> "cô đơn"
+            EmotionType.CONFUSED -> "bối rối"
+            EmotionType.JEALOUS -> "ghen tị"
+            EmotionType.EXCITED -> "phấn khích"
+        }
+        return "Trong màn chơi này, bé hãy ghép một khuôn mặt $emotionName nhé! Cố lên nào!"
+    }
+
+    override fun onCleared() {
+        pendingIntroEmotion = null
+        tts?.stop()
+        tts?.shutdown()
+        super.onCleared()
     }
 
     companion object {

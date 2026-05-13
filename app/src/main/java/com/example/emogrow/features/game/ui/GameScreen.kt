@@ -79,6 +79,7 @@ fun GameScreen(
     onExit: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val replayCount by viewModel.replayCount.collectAsState()
 
     var faceCanvasPosition by remember { mutableStateOf(Offset.Zero) }
     var faceCanvasSize by remember { mutableStateOf(Size.Zero) }
@@ -104,6 +105,12 @@ fun GameScreen(
         showSticker = false
     }
 
+    // Đọc to hướng dẫn mỗi khi vào màn mới hoặc chơi lại.
+    LaunchedEffect(uiState.currentRound.emotion, replayCount) {
+        delay(500)
+        viewModel.speakRoundIntro(uiState.currentRound.emotion)
+    }
+
     LaunchedEffect(uiState.isCompleted) {
         if (uiState.isCompleted) {
             confettiKey += 1
@@ -115,7 +122,10 @@ fun GameScreen(
     if (showExitDialog) {
         BackHandler { showExitDialog = false }
     } else {
-        BackHandler { showExitDialog = true }
+        BackHandler {
+            viewModel.stopSpeaking()
+            showExitDialog = true
+        }
     }
 
     Box(
@@ -230,7 +240,10 @@ fun GameScreen(
             contentAlignment = Alignment.Center
         ) {
             IconButton(
-                onClick = { showExitDialog = true },
+                onClick = {
+                    viewModel.stopSpeaking()
+                    showExitDialog = true
+                },
                 modifier = Modifier.fillMaxSize()
             ) {
                 Icon(
@@ -244,6 +257,7 @@ fun GameScreen(
         if (showExitDialog) {
             ConfirmExitDialog(
                 onConfirmExit = {
+                    viewModel.stopSpeaking()
                     showExitDialog = false
                     onExit()
                 },

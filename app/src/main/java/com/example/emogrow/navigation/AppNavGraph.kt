@@ -1,10 +1,17 @@
 package com.example.emogrow.navigation
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.example.emogrow.features.auth.ui.LoginScreen
 import com.example.emogrow.features.auth.ui.RegisterScreen
 import com.example.emogrow.features.auth.viewmodel.AuthViewModel
@@ -21,26 +28,24 @@ import com.example.emogrow.features.emotions.viewmodel.EmotionViewModelFactory
 import com.example.emogrow.features.home.ui.HomeScreen
 import com.example.emogrow.features.review.ui.KnowledgeShelfScreen
 import com.example.emogrow.features.review.ui.ReviewScreen
-import com.example.emogrow.features.review.viewmodel.ReviewViewModel
-import com.example.emogrow.features.review.viewmodel.ReviewViewModelFactory
+import com.example.emogrow.features.review.viewmodel.ReviewSharedViewModel
+import com.example.emogrow.features.review.viewmodel.ReviewSharedViewModelFactory
 
 @Composable
 fun AppNavGraph(
     authFactory: AuthViewModelFactory,
     childFactory: ChildViewModelFactory,
     emotionFactory: EmotionViewModelFactory,
-    reviewFactory: ReviewViewModelFactory
 ) {
     val navController = rememberNavController()
 
     val authViewModel: AuthViewModel = viewModel(factory = authFactory)
     val childViewModel: ChildViewModel = viewModel(factory = childFactory)
     val emotionViewModel: EmotionViewModel = viewModel(factory = emotionFactory)
-    val reviewViewModel: ReviewViewModel = viewModel(factory = reviewFactory)
 
     NavHost(
         navController = navController,
-        startDestination = Screen.Login.route
+        startDestination = Screen.ReviewGraph.createRoute(1)
     ) {
         composable(Screen.Login.route) {
             LoginScreen(
@@ -112,39 +117,104 @@ fun AppNavGraph(
                 onNavigateToGame = {
                     // TODO
                 },
-                onNavigateToJournal = {
-                    // TODO
-                },
                 onNavigateToReview = {
                     navController.navigate(Screen.Review.createRoute(childId))
+                },
+                onNavigateToJournal = {
+                    // TODO
                 }
             )
         }
 
-        composable(Screen.Review.route) { backStackEntry ->
-            val childId = backStackEntry.arguments
-                ?.getString("childId")
-                ?.toInt() ?: 0
+        navigation(
+            route = Screen.ReviewGraph.route,
+            startDestination = Screen.Review.route
+        ) {
+            composable(
+                route = Screen.Review.route,
+                enterTransition = { fadeIn(animationSpec = tween(300)) },
+                exitTransition = { fadeOut(animationSpec = tween(300)) }
+            ) { backStackEntry ->
+                val childId = backStackEntry.arguments
+                    ?.getString("childId")
+                    ?.toInt() ?: 0
 
-            ReviewScreen(
-                childId = childId,
-                viewModel = reviewViewModel,
-                onBack = { navController.popBackStack() },
-                onNavigateToKnowledgeShelf = {
-                    navController.navigate(Screen.KnowledgeShelf.createRoute(childId))
+                val parentEntry = remember(backStackEntry) {
+                    navController.getBackStackEntry(Screen.ReviewGraph.route)
                 }
-            )
-        }
+                val sharedViewModel: ReviewSharedViewModel = viewModel(
+                    viewModelStoreOwner = parentEntry,
+                    factory = ReviewSharedViewModelFactory(childId)
+                )
 
-        composable(Screen.KnowledgeShelf.route) { backStackEntry ->
-            val childId = backStackEntry.arguments
-                ?.getString("childId")
-                ?.toInt() ?: 0
+                ReviewScreen(
+                    viewModel = sharedViewModel,
+                    onNavigateToKnowledgeShelf = { date ->
+                        navController.navigate(Screen.KnowledgeShelf.createRoute(childId, date = date)) {
+                            launchSingleTop = true
+                        }
+                    }
+                )
+            }
 
-            KnowledgeShelfScreen(
-                viewModel = reviewViewModel,
-                onBack = { navController.popBackStack() }
-            )
+            composable(
+                route = Screen.KnowledgeShelf.route,
+                arguments = listOf(
+                    navArgument("childId") { type = NavType.IntType },
+                    navArgument("emotionId") { type = NavType.StringType; nullable = true; defaultValue = null },
+                    navArgument("date") { type = NavType.StringType; nullable = true; defaultValue = null }
+                ),
+                enterTransition = {
+                    slideInHorizontally(
+                        initialOffsetX = { it },
+                        animationSpec = tween(300)
+                    ) + fadeIn(animationSpec = tween(300))
+                },
+                exitTransition = {
+                    slideOutHorizontally(
+                        targetOffsetX = { it },
+                        animationSpec = tween(300)
+                    ) + fadeOut(animationSpec = tween(300))
+                }
+            ) { backStackEntry ->
+                val childId = backStackEntry.arguments
+                    ?.getInt("childId")
+                    ?: 0
+                val emotionId = backStackEntry.arguments?.getString("emotionId")
+                val date = backStackEntry.arguments?.getString("date")?.let(android.net.Uri::decode)
+
+                val parentEntry = remember(backStackEntry) {
+                    navController.getBackStackEntry(Screen.ReviewGraph.route)
+                }
+                val sharedViewModel: ReviewSharedViewModel = viewModel(
+                    viewModelStoreOwner = parentEntry,
+                    factory = ReviewSharedViewModelFactory(childId)
+                )
+
+                LaunchedEffect(emotionId, date) {
+                    when {
+                        date != null -> sharedViewModel.navigateToKnowledgeShelfWithDate(date)
+                        emotionId != null -> sharedViewModel.navigateToKnowledgeShelfWithFilter(emotionId)
+                    }
+                }
+
+                KnowledgeShelfScreen(
+                    viewModel = sharedViewModel,
+                    onBack = { navController.popBackStack() },
+                    onNavigateToEmotionJarWithHighlight = { emotionCategory ->
+                        val emotionId = when (emotionCategory) {
+                            "Giận dữ" -> "tuc-gian"
+                            "Vui vẻ" -> "vui-ve"
+                            "Buồn bã" -> "buon"
+                            "Bình thường" -> "binh-tinh"
+                            "Yêu thương" -> "yeu-thuong"
+                            else -> null
+                        }
+                        sharedViewModel.highlightBeadsByEmotion(emotionId)
+                        navController.popBackStack()
+                    }
+                )
+            }
         }
 
         composable(Screen.EmotionList.route) { backStackEntry ->
@@ -217,34 +287,6 @@ fun AppNavGraph(
                 viewModel = emotionViewModel,
                 onBack = {
                     navController.popBackStack()
-                }
-            )
-        }
-
-        composable(Screen.EmotionFlashcardList.route) { backStackEntry ->
-            val childId = backStackEntry.arguments
-                ?.getString("childId")
-                ?.toInt() ?: 0
-
-            val emotionId = backStackEntry.arguments
-                ?.getString("emotionId")
-                ?.toInt() ?: 0
-
-            EmotionFlashcardListScreen(
-                childId = childId,
-                emotionId = emotionId,
-                viewModel = emotionViewModel,
-                onBack = {
-                    navController.popBackStack()
-                },
-                onSelectFlashcard = { flashcard ->
-                    navController.navigate(
-                        Screen.EmotionFlashcardStudy.createRoute(
-                            childId = childId,
-                            emotionId = emotionId,
-                            flashcardId = flashcard.flashcard_id
-                        )
-                    )
                 }
             )
         }

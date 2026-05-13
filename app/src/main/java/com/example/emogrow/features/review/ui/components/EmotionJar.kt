@@ -1,230 +1,185 @@
 package com.example.emogrow.features.review.ui.components
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.emogrow.data.remote.dto.review.EmotionStatisticItem
+import com.example.emogrow.features.review.viewmodel.EmotionBead
+import com.example.emogrow.ui.theme.JarNeck
 
 @Composable
-fun EmotionJar(
-    distribution: List<EmotionStatisticItem>,
-    modifier: Modifier = Modifier
+fun EmotionJarPreview(
+    beads: List<EmotionBead>,
+    modifier: Modifier = Modifier,
+    jarWidth: Dp = 320.dp,
+    jarHeight: Dp = 420.dp,
+    highlightedBeadId: String? = null,
+    onBeadClick: (EmotionBead) -> Unit = {}
 ) {
-    val fallProgress = remember { Animatable(0f) }
-    val hasData = distribution.isNotEmpty() && distribution.any { it.count > 0 }
+    val beadSize = 52.dp
+    val beadSpacing = 12.dp
 
-    LaunchedEffect(hasData) {
-        if (hasData) {
-            fallProgress.snapTo(0f)
-            fallProgress.animateTo(
-                targetValue = 1f,
-                animationSpec = tween(
-                    durationMillis = 1500,
-                    easing = FastOutSlowInEasing
-                )
+    Box(
+        modifier = modifier.size(jarWidth, jarHeight),
+        contentAlignment = Alignment.Center
+    ) {
+        // 1. Glass jar background (vẽ lọ thủy tinh)
+        Canvas(modifier = Modifier.size(jarWidth, jarHeight)) {
+            val w = size.width
+            val h = size.height
+
+            // Thân lọ (phần chứa bi)
+            drawRoundRect(
+                color = Color.White.copy(alpha = 0.75f),
+                topLeft = Offset(w * 0.10f, h * 0.10f),
+                size = Size(w * 0.80f, h * 0.85f),
+                cornerRadius = CornerRadius(w * 0.20f, w * 0.20f)
+            )
+            // Cổ lọ
+            drawRoundRect(
+                color = JarNeck,
+                topLeft = Offset(w * 0.30f, h * 0.02f),
+                size = Size(w * 0.40f, h * 0.10f),
+                cornerRadius = CornerRadius(w * 0.05f, w * 0.05f)
+            )
+            // Ánh sáng phản chiếu
+            drawRoundRect(
+                color = Color.White.copy(alpha = 0.35f),
+                topLeft = Offset(w * 0.17f, h * 0.16f),
+                size = Size(w * 0.08f, h * 0.60f),
+                cornerRadius = CornerRadius(w * 0.04f, w * 0.04f),
+                style = Stroke(width = 3.dp.toPx())
             )
         }
-    }
 
-    Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val jarWidth = size.width * 0.65f
-            val jarHeight = size.height * 0.75f
-            val centerX = size.width / 2f
-            val centerY = size.height / 2f
+        // 2. Vùng chứa lưới bi (được cắt để nằm gọn trong thân lọ)
+        BoxWithConstraints(modifier = Modifier.size(jarWidth, jarHeight)) {
+            // Tính toán kích thước và vị trí lưới để khớp với thân lọ đã vẽ
+            val bodyLeft = maxWidth * 0.14f       // 14% từ trái -> margin trái 4% so với thân lọ (bắt đầu 10%)
+            val bodyTop = maxHeight * 0.16f       // 16% từ trên -> tránh cổ lọ
+            val bodyWidth = maxWidth * 0.72f      // 72% chiều rộng lọ -> margin phải 4% (vì thân lọ rộng 80%)
+            val bodyHeight = maxHeight * 0.80f    // 80% chiều cao lọ
 
-            val jarLeft = centerX - jarWidth / 2f
-            val jarTop = centerY - jarHeight / 2f
-
-            val jarColor = MaterialTheme.colorScheme.outlineVariant
-            val jarFillColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-
-            drawJar(
-                left = jarLeft,
-                top = jarTop,
-                width = jarWidth,
-                height = jarHeight,
-                jarColor = jarColor,
-                jarFillColor = jarFillColor
+            // Bo góc giống thân lọ
+            val jarShape = RoundedCornerShape(
+                topStart = (jarWidth.value * 0.20f).dp,
+                topEnd = (jarWidth.value * 0.20f).dp,
+                bottomStart = (jarWidth.value * 0.18f).dp,
+                bottomEnd = (jarWidth.value * 0.18f).dp
             )
 
-            if (hasData) {
-                drawEmotionBalls(
-                    distribution = distribution,
-                    jarLeft = jarLeft,
-                    jarTop = jarTop + jarHeight * 0.15f,
-                    jarWidth = jarWidth,
-                    jarHeight = jarHeight * 0.7f,
-                    fallProgress = fallProgress.value
+            Box(
+                modifier = Modifier
+                    .size(bodyWidth, bodyHeight)
+                    .align(Alignment.TopStart)
+                    .offset(x = bodyLeft, y = bodyTop)  // ✅ ĐÃ SỬA: sử dụng trực tiếp bodyLeft (14%) thay vì trừ thành 0
+                    .clip(jarShape)
+            ) {
+                // Lưới 3 cột, có thể cuộn
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(3),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(beadSpacing),
+                    verticalArrangement = Arrangement.spacedBy(beadSpacing),
+                    userScrollEnabled = true
+                ) {
+                    items(beads, key = { it.id }) { bead ->
+                        AnimatedEmotionBead(
+                            bead = bead,
+                            size = beadSize,
+                            isHighlighted = highlightedBeadId == bead.id || bead.isToday,
+                            onClick = { onBeadClick(bead) }
+                        )
+                    }
+                }
+
+                // Làm mờ phía trên (vùng cổ lọ)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(40.dp)
+                        .align(Alignment.TopCenter)
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(Color(0xFFF5F5F5), Color.Transparent)
+                            )
+                        )
+                )
+
+                // Làm mờ phía dưới đáy lọ
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(32.dp)
+                        .align(Alignment.BottomCenter)
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(Color.Transparent, Color(0xFFF5F5F5))
+                            )
+                        )
                 )
             }
         }
+    }
+}
 
-        if (!hasData) {
-            Text(
-                text = "Hãy gieo mầm\ncảm xúc nhé!",
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                lineHeight = 24.sp
+@Composable
+private fun AnimatedEmotionBead(
+    bead: EmotionBead,
+    size: Dp,
+    isHighlighted: Boolean,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .size(size)
+            .shadow(
+                elevation = if (isHighlighted) 12.dp else 4.dp,
+                shape = CircleShape,
+                spotColor = bead.color
             )
-        }
-    }
-}
-
-private fun DrawScope.drawJar(
-    left: Float,
-    top: Float,
-    width: Float,
-    height: Float,
-    jarColor: Color,
-    jarFillColor: Color
-) {
-    val neckWidth = width * 0.4f
-    val neckHeight = height * 0.15f
-    val neckLeft = left + (width - neckWidth) / 2f
-    val neckTop = top
-    val bodyTop = top + neckHeight
-    val cornerRadius = width * 0.12f
-
-    drawRoundRect(
-        color = jarFillColor,
-        topLeft = Offset(neckLeft, neckTop),
-        size = Size(neckWidth, neckHeight * 0.6f),
-        cornerRadius = CornerRadius(cornerRadius * 0.3f, cornerRadius * 0.3f)
-    )
-
-    drawRoundRect(
-        color = jarFillColor,
-        topLeft = Offset(left, bodyTop),
-        size = Size(width, height - (bodyTop - top)),
-        cornerRadius = CornerRadius(cornerRadius, cornerRadius)
-    )
-
-    drawRoundRect(
-        color = jarColor,
-        topLeft = Offset(neckLeft, neckTop),
-        size = Size(neckWidth, neckHeight * 0.6f),
-        cornerRadius = CornerRadius(cornerRadius * 0.3f, cornerRadius * 0.3f),
-        style = Stroke(width = 4f)
-    )
-
-    drawRoundRect(
-        color = jarColor,
-        topLeft = Offset(left, bodyTop),
-        size = Size(width, height - (bodyTop - top)),
-        cornerRadius = CornerRadius(cornerRadius, cornerRadius),
-        style = Stroke(width = 4f)
-    )
-
-    val lidWidth = neckWidth * 1.1f
-    val lidHeight = neckHeight * 0.5f
-    val lidLeft = neckLeft - (lidWidth - neckWidth) / 2f
-    val lidTop = neckTop - lidHeight
-
-    drawRoundRect(
-        color = jarColor,
-        topLeft = Offset(lidLeft, lidTop),
-        size = Size(lidWidth, lidHeight),
-        cornerRadius = CornerRadius(cornerRadius * 0.4f, cornerRadius * 0.4f)
-    )
-}
-
-private fun DrawScope.drawEmotionBalls(
-    distribution: List<EmotionStatisticItem>,
-    jarLeft: Float,
-    jarTop: Float,
-    jarWidth: Float,
-    jarHeight: Float,
-    fallProgress: Float
-) {
-    val totalCount = distribution.sumOf { it.count }.coerceAtLeast(1)
-    val padding = jarWidth * 0.1f
-    val ballAreaWidth = jarWidth - padding * 2
-    val ballAreaHeight = jarHeight - padding * 2
-
-    val ballRadius = (minOf(ballAreaWidth, ballAreaHeight) / 8f)
-        .coerceIn(12f, 28f)
-
-    val balls = mutableListOf<Pair<Offset, Color>>()
-    var currentX = jarLeft + padding + ballRadius
-    var currentY = jarTop + jarHeight - padding - ballRadius
-    var column = 0
-    val maxBallsInRow = ((ballAreaWidth - ballRadius) / (ballRadius * 2.2f)).toInt().coerceAtLeast(1)
-
-    for (item in distribution) {
-        repeat(item.count) {
-            val color = parseEmotionColor(item.color_code) ?: getDefaultEmotionColor(item.emotion_type)
-
-            val animatedY = currentY + (1f - fallProgress) * (jarHeight * 0.5f)
-
-            balls.add(Offset(currentX, animatedY), color)
-
-            column++
-            if (column >= maxBallsInRow) {
-                column = 0
-                currentX = jarLeft + padding + ballRadius
-                currentY -= ballRadius * 2.4f
-            } else {
-                currentX += ballRadius * 2.2f
-            }
-
-            if (currentY - ballRadius < jarTop + padding) return@repeat
-        }
-    }
-
-    for ((position, color) in balls) {
-        drawCircle(
-            color = color,
-            radius = ballRadius,
-            center = position
+            .clip(CircleShape)
+            .background(
+                Brush.radialGradient(
+                    colors = listOf(Color.White.copy(alpha = 0.8f), bead.color)
+                )
+            )
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = bead.emoji,
+            fontSize = (size.value * 0.40f).sp
         )
-        drawCircle(
-            color = Color.White.copy(alpha = 0.3f),
-            radius = ballRadius * 0.3f,
-            center = Offset(position.x - ballRadius * 0.25f, position.y - ballRadius * 0.25f)
-        )
-    }
-}
-
-private fun parseEmotionColor(colorCode: String?): Color? {
-    if (colorCode.isNullOrBlank()) return null
-    return try {
-        Color(android.graphics.Color.parseColor(colorCode))
-    } catch (_: IllegalArgumentException) {
-        null
-    }
-}
-
-private fun getDefaultEmotionColor(emotionType: Int): Color {
-    return when (emotionType) {
-        1 -> Color(0xFFFF6B6B)
-        2 -> Color(0xFFFFE66D)
-        3 -> Color(0xFF4ECDC4)
-        4 -> Color(0xFF95E1D3)
-        5 -> Color(0xFFDDA0DD)
-        6 -> Color(0xFFFFA07A)
-        else -> Color(0xFFB8B8B8)
     }
 }

@@ -1,7 +1,6 @@
 package com.example.emogrow.features.review.ui
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -19,20 +18,21 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.emogrow.R
 import com.example.emogrow.features.review.ui.components.BeadDetailDialog
 import com.example.emogrow.features.review.ui.components.EmotionColorBottomSheet
 import com.example.emogrow.features.review.ui.components.EmotionJarPreview
 import com.example.emogrow.features.review.viewmodel.ReviewSharedViewModel
 import com.example.emogrow.ui.theme.*
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 @Composable
 fun ReviewScreen(
@@ -66,17 +66,46 @@ fun ReviewScreen(
             // B. Mascot & Bubble
             MascotBubble(message = uiState.mascotMessage)
 
-            // C. Jar with Emotion Bubbles
-            Box(
+            TimeTravelPicker(
+                currentViewDate = uiState.currentViewDate,
+                onPreviousMonth = { viewModel.previousMonth() },
+                onNextMonth = { viewModel.nextMonth() },
+                onToday = { viewModel   .goToToday() }
+            )
+
+            // C. Jar with Emotion Beads (đã sửa để chống tràn và hiển thị số hạt)
+            Column(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
-                contentAlignment = Alignment.Center
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                EmotionJarPreview(
-                    emotions = uiState.emotions,
-                    highlightedBeadId = uiState.highlightedBeadId,
-                    onBeadClick = { viewModel.openBeadDialog(it) }
+                // Vùng chứa lọ, được cắt để hạt không vượt ra ngoài
+                Box(
+                    modifier = Modifier
+                        .weight(1f)            // chiếm không gian còn lại trong cột
+                        .fillMaxWidth()
+                        .clipToBounds(),        // cắt mọi nội dung vẽ ra ngoài
+                    contentAlignment = Alignment.Center
+                ) {
+                    EmotionJarPreview(
+                        beads = uiState.pastBeads,
+                        highlightedBeadId = uiState.highlightedBeadId,
+                        onBeadClick = { bead ->
+                            viewModel.highlightBead(bead.id)
+                            viewModel.openBeadDialog(bead)
+                        }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // Hiển thị số hạt để debug
+                Text(
+                    text = "Số hạt: ${uiState.pastBeads.size}",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color.DarkGray.copy(alpha = 0.8f)
                 )
             }
 
@@ -95,17 +124,18 @@ fun ReviewScreen(
         // Overlay Components
         EmotionColorBottomSheet(
             isOpen = uiState.isHelpSheetOpen,
+            viewModel = viewModel,
             onDismiss = { viewModel.closeHelpSheet() }
         )
 
         BeadDetailDialog(
-            bubble = uiState.selectedBead,
+            bead = uiState.selectedBead,
             isOpen = uiState.isBeadDialogOpen,
             onDismiss = { viewModel.closeBeadDialog() },
-            onNavigateToLessons = {
-                val emotionId = uiState.selectedBead?.id
+            onNavigateToDate = {
+                val date = uiState.selectedBead?.date
                 viewModel.closeBeadDialog()
-                onNavigateToKnowledgeShelf(emotionId)
+                onNavigateToKnowledgeShelf(date)
             }
         )
     }
@@ -159,14 +189,11 @@ private fun MascotBubble(message: String) {
         // Mascot: Plant image
         Box(
             modifier = Modifier
-                .size(60.dp),
+                .size(60.dp)
+                .background(Color.Green, CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            Image(
-                painter = painterResource(id = R.drawable.img_mascot_plant),
-                contentDescription = "Mascot",
-                modifier = Modifier.fillMaxSize()
-            )
+            Text("M", color = Color.White)
         }
 
         Spacer(modifier = Modifier.width(12.dp))
@@ -184,6 +211,57 @@ private fun MascotBubble(message: String) {
                 fontSize = 14.sp,
                 color = Color.DarkGray,
                 lineHeight = 18.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun TimeTravelPicker(
+    currentViewDate: LocalDate,
+    onPreviousMonth: () -> Unit,
+    onNextMonth: () -> Unit,
+    onToday: () -> Unit
+) {
+    val formatter = DateTimeFormatter.ofPattern("MMMM yyyy", java.util.Locale.forLanguageTag("vi-VN"))
+    val today = LocalDate.now()
+    val canGoNext = currentViewDate.plusMonths(1).let {
+        it.year < today.year || (it.year == today.year && it.monthValue <= today.monthValue)
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = onPreviousMonth) {
+            Text("◀", fontSize = 18.sp)
+        }
+
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = currentViewDate.format(formatter),
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF5D4037)
+            )
+            if (currentViewDate.month != today.month || currentViewDate.year != today.year) {
+                Text(
+                    text = "Hôm nay",
+                    fontSize = 12.sp,
+                    color = LightPurple,
+                    modifier = Modifier.clickable { onToday() }
+                )
+            }
+        }
+
+        IconButton(onClick = onNextMonth, enabled = canGoNext) {
+            Text(
+                text = "▶",
+                fontSize = 18.sp,
+                color = if (canGoNext) Color(0xFF5D4037) else Color.LightGray
             )
         }
     }
@@ -307,11 +385,10 @@ private fun BottomDecor(modifier: Modifier = Modifier) {
                 color = Color.White.copy(alpha = 0.5f),
                 radius = 4f,
                 center = androidx.compose.ui.geometry.Offset(
-                    x = ((w / 15) * i) + (10..30).random(),
-                    y = (h * 0.7f) + (0..20).random()
+                    x = ((w / 15) * i) + 20f,
+                    y = (h * 0.7f) + 10f
                 )
             )
         }
     }
 }
-

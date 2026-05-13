@@ -1,12 +1,17 @@
 package com.example.emogrow.features.review.ui
 
-import androidx.compose.animation.core.tween
+import android.util.Log
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -24,6 +29,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -45,6 +51,10 @@ import com.example.emogrow.features.review.ui.components.StickerPopupDialog
 import com.example.emogrow.features.review.viewmodel.ReviewSharedViewModel
 import com.example.emogrow.ui.theme.*
 import com.example.emogrow.ui.theme.BookRed
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+
+import androidx.compose.runtime.LaunchedEffect
 
 @Composable
 fun KnowledgeShelfScreen(
@@ -53,25 +63,47 @@ fun KnowledgeShelfScreen(
     onNavigateToEmotionJarWithHighlight: (String) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val shelves = viewModel.shelves
+    val shelves by viewModel.shelves.collectAsState()
     val allStickers = viewModel.allStickersList
+    val highlightedDate = uiState.highlightedDate
+    val listState = rememberLazyListState()
+
+    // Glow + highlight the book for selected bead date — no auto-open
+    LaunchedEffect(uiState.scrollToDate) {
+        uiState.scrollToDate?.let { date ->
+            viewModel.prepareForDate(date)
+            viewModel.clearScrollToDate()
+        }
+    }
+
+    // Auto-scroll to glowing shelf
+    LaunchedEffect(highlightedDate, shelves) {
+        if (highlightedDate != null && shelves.isNotEmpty()) {
+            val index = shelves.indexOfFirst { shelfMatchesDate(it.date, highlightedDate) }
+            if (index >= 0) {
+                listState.animateScrollToItem(index.coerceAtLeast(0), scrollOffset = -60)
+            }
+        }
+    }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFFFF9C4)) // Warm light yellow background
+            .background(Color(0xFFFFF9C4))
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .padding(bottom = 80.dp)
         ) {
             // A. Header Card
             ShelfHeader(
+                modifier = Modifier.zIndex(1f),
                 onBack = onBack,
                 onAlbumClick = { viewModel.openStickerModal() }
             )
 
-            // Scrollable content
+            // Scrollable content - proper padding to avoid overlay
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -79,34 +111,29 @@ fun KnowledgeShelfScreen(
                     .padding(bottom = 16.dp)
                     .shadow(8.dp, RoundedCornerShape(24.dp))
                     .clip(RoundedCornerShape(24.dp))
-                    .background(Color(0xFF8B4513).copy(alpha = 0.8f)) // Outer frame
+                    .background(Color(0xFF8B4513).copy(alpha = 0.8f))
                     .padding(8.dp)
-                    .background(Color(0xFFD2B48C), RoundedCornerShape(16.dp)) // Inner wood
+                    .background(Color(0xFFD2B48C), RoundedCornerShape(16.dp))
             ) {
-                Column(
+                LazyColumn(
+                    state = listState,
                     modifier = Modifier
                         .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
                         .padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(24.dp),
+                    userScrollEnabled = true
                 ) {
-                    // B. 3 Book Shelves
-                    shelves.forEach { shelf ->
+                    items(shelves, key = { it.date }) { shelf ->
                         BookShelfItem(
                             shelfData = shelf,
                             readBooks = uiState.readBooks,
+                            highlightedDate = highlightedDate,
                             onBookClick = { viewModel.openBookDialog(it) }
                         )
                     }
-
-                    // C. Sticker Album Section
-                    StickerAlbumSection(
-                        stickers = allStickers.take(12),
-                        unlockedStickers = uiState.unlockedStickers,
-                        onStickerClick = { viewModel.openStickerPopup(it) }
-                    )
-
-                    Spacer(modifier = Modifier.height(100.dp))
+                    item {
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
                 }
             }
         }
@@ -183,9 +210,9 @@ fun KnowledgeShelfScreen(
 }
 
 @Composable
-private fun ShelfHeader(onBack: () -> Unit, onAlbumClick: () -> Unit) {
+private fun ShelfHeader(modifier: Modifier = Modifier, onBack: () -> Unit, onAlbumClick: () -> Unit) {
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(16.dp)
             .padding(top = 24.dp),
@@ -266,6 +293,7 @@ private fun ShelfHeader(onBack: () -> Unit, onAlbumClick: () -> Unit) {
 private fun BookShelfItem(
     shelfData: ShelfData,
     readBooks: Set<String>,
+    highlightedDate: String?,
     onBookClick: (Book) -> Unit
 ) {
     Column {
@@ -315,7 +343,7 @@ private fun BookShelfItem(
                 }
             }
 
-            Row(
+            LazyRow(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp)
@@ -323,28 +351,14 @@ private fun BookShelfItem(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.Bottom
             ) {
-                shelfData.books.forEach { book ->
+                items(shelfData.books) { book ->
                     BookItem(
                         book = book,
                         isRead = readBooks.contains(book.id),
+                        isHighlighted = highlightedDate != null && shelfMatchesDate(shelfData.date, highlightedDate),
+                        modifier = Modifier.width(100.dp),   // cố định chiều rộng mỗi cuốn
                         onClick = { onBookClick(book) }
                     )
-                }
-
-                // Decorative plant if room
-                if (shelfData.books.size < 4) {
-                    Box(
-                        modifier = Modifier
-                            .size(60.dp)
-                            .padding(bottom = 8.dp),
-                        contentAlignment = Alignment.BottomCenter
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.img_mascot_plant),
-                            contentDescription = null,
-                            modifier = Modifier.size(50.dp)
-                        )
-                    }
                 }
             }
 
@@ -368,24 +382,69 @@ private fun BookShelfItem(
     }
 }
 
+private val shelfDateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
+private const val TAG = "ShelfMatch"
+
+private fun shelfMatchesDate(shelfDate: String, highlightedDate: String): Boolean {
+    val datePart = shelfDate.substringAfter(" - ", shelfDate.takeLast(10))
+    Log.d(TAG, "shelfDate=$shelfDate | datePart=$datePart | highlightedDate=$highlightedDate")
+    return try {
+        val shelfLocalDate = LocalDate.parse(datePart, shelfDateFormatter)
+        val highlightLocalDate = LocalDate.parse(highlightedDate)
+        Log.d(TAG, "parsed shelf=$shelfLocalDate | highlight=$highlightLocalDate | match=${shelfLocalDate == highlightLocalDate}")
+        shelfLocalDate == highlightLocalDate
+    } catch (e: Exception) {
+        Log.e(TAG, "parse error: ${e.message}")
+        false
+    }
+}
+
 @Composable
 private fun BookItem(
     book: Book,
     isRead: Boolean,
+    isHighlighted: Boolean,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
+    val glowTransition = rememberInfiniteTransition(label = "bookGlow")
+    val animatedGlowAlpha by glowTransition.animateFloat(
+        initialValue = 0.35f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "glowAlpha"
+    )
+    val glowAlpha = if (isHighlighted) animatedGlowAlpha else 0f
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .width(90.dp)
+        modifier = modifier
             .clickable(onClick = onClick)
             .padding(bottom = 8.dp)
     ) {
         Box(
             modifier = Modifier
-                .width(85.dp)
-                .height(130.dp)
-                .shadow(4.dp, RoundedCornerShape(8.dp))
+                .fillMaxWidth()
+                .aspectRatio(0.65f)
+                .then(
+                    if (isHighlighted) {
+                        Modifier
+                            .shadow(
+                                elevation = (24 * glowAlpha).dp,
+                                shape = RoundedCornerShape(16.dp),
+                                spotColor = GoldStar.copy(alpha = glowAlpha),
+                                ambientColor = GoldStar.copy(alpha = glowAlpha)
+                            )
+                            .background(GoldStar.copy(alpha = 0.25f * glowAlpha), RoundedCornerShape(16.dp))
+                            .border(5.dp, GoldStar.copy(alpha = 0.9f * glowAlpha), RoundedCornerShape(16.dp))
+                            .padding(6.dp)
+                    } else {
+                        Modifier.shadow(4.dp, RoundedCornerShape(8.dp))
+                    }
+                )
                 .clip(RoundedCornerShape(8.dp))
                 .background(book.color),
             contentAlignment = Alignment.Center
@@ -446,9 +505,10 @@ private fun BookItem(
 private fun StickerAlbumSection(
     stickers: List<Sticker>,
     unlockedStickers: Set<String>,
+    modifier: Modifier = Modifier,
     onStickerClick: (Sticker) -> Unit
 ) {
-    Column {
+    Column(modifier = modifier) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(bottom = 8.dp)
@@ -473,7 +533,7 @@ private fun StickerAlbumSection(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(260.dp)
+                .fillMaxHeight(0.3f)
                 .background(Color(0xFFFDF5E6), RoundedCornerShape(16.dp))
                 .border(2.dp, Color(0xFF8B4513).copy(alpha = 0.5f), RoundedCornerShape(16.dp))
         ) {
@@ -495,15 +555,15 @@ private fun StickerAlbumSection(
             }
 
             LazyVerticalGrid(
-                columns = GridCells.Fixed(3),
+                columns = GridCells.Adaptive(minSize = 64.dp),
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(start = 32.dp, top = 16.dp, end = 16.dp, bottom = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                userScrollEnabled = false
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                userScrollEnabled = true
             ) {
-                items(stickers.take(9)) { sticker ->
+                items(stickers) { sticker ->
                     StickerItem(
                         sticker = sticker,
                         isUnlocked = unlockedStickers.contains(sticker.id),
@@ -530,7 +590,7 @@ private fun StickerItem(
 
     Box(
         modifier = Modifier
-            .aspectRatio(1.2f)
+            .size(64.dp)
             .shadow(2.dp, RoundedCornerShape(12.dp))
             .clip(RoundedCornerShape(12.dp))
             .background(Color.White)
@@ -541,7 +601,7 @@ private fun StickerItem(
             painter = painterResource(id = stickerImageRes),
             contentDescription = sticker.name,
             modifier = Modifier
-                .size(50.dp)
+                .size(48.dp)
                 .alpha(if (isUnlocked) 1f else 0.3f)
         )
     }
@@ -640,5 +700,3 @@ private fun TeddyMascot(
         }
     }
 }
-
-

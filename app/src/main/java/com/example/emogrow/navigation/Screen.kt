@@ -1,5 +1,7 @@
 package com.example.emogrow.navigation
 
+import android.net.Uri
+
 sealed class Screen(val route: String) {
     object Login : Screen("login")
     object Register : Screen("register")
@@ -30,7 +32,20 @@ sealed class Screen(val route: String) {
         fun createRoute(childId: Int) = "review/$childId"
     }
 
-    object KnowledgeShelf : Screen("knowledge_shelf/{childId}") {
-        fun createRoute(childId: Int) = "knowledge_shelf/$childId"
+    object ReviewGraph : Screen("review_graph/{childId}") {
+        fun createRoute(childId: Int) = "review_graph/$childId"
+    }
+
+    object KnowledgeShelf : Screen("knowledge_shelf/{childId}?date={date}&emotion={emotionId}") {
+        fun createRoute(childId: Int, emotionId: String? = null, date: String? = null): String {
+            val params = mutableListOf<String>()
+            if (date != null) params.add("date=${Uri.encode(date)}")
+            if (emotionId != null) params.add("emotion=${Uri.encode(emotionId)}")
+            return if (params.isNotEmpty()) {
+                "knowledge_shelf/$childId?${params.joinToString("&")}"
+            } else {
+                "knowledge_shelf/$childId"
+            }
+        }
     }
 }

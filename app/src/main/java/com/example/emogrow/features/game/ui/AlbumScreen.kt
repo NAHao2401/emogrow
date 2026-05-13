@@ -1,4 +1,4 @@
-package com.example.emogrow.features.album.ui
+package com.example.emogrow.features.game.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable

@@ -1,6 +1,5 @@
 package com.example.emogrow.features.game.ui
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Arrangement
@@ -12,16 +11,12 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.Canvas
 import androidx.compose.material3.Text
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.animateOffsetAsState
-import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -39,13 +34,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.withTransform
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -90,7 +82,6 @@ fun GameScreen(
 
     var confettiKey by remember { mutableStateOf(0) }
     var showConfetti by remember { mutableStateOf(false) }
-    var showSticker by remember { mutableStateOf(false) }
 
     LaunchedEffect(levelId) {
         viewModel.setLevel(levelId)
@@ -98,7 +89,6 @@ fun GameScreen(
 
     LaunchedEffect(uiState.currentRound) {
         showConfetti = false
-        showSticker = false
     }
 
     LaunchedEffect(uiState.isCompleted) {
@@ -188,29 +178,11 @@ fun GameScreen(
                 key = confettiKey,
                 onFinished = {
                     showConfetti = false
-                    showSticker = true
-                }
-            )
-        }
-
-        if (showSticker) {
-            StickerAwardAnimation(
-                stickerImageUrl = stickerResNameForEmotion(uiState.currentRound.emotion),
-                onAnimationComplete = {
-                    showSticker = false
                     onLevelCompleted(levelId)
                 }
             )
         }
     }
-}
-
-private fun stickerResNameForEmotion(emotion: EmotionType): String = when (emotion) {
-    EmotionType.HAPPY -> "part_mouth_happy"
-    EmotionType.SAD -> "part_mouth_sad"
-    EmotionType.ANGRY -> "part_mouth_angry"
-    EmotionType.SURPRISED -> "part_eye_happy_left"
-    EmotionType.SCARED -> "part_eye_sad_left"
 }
 
 @Composable
@@ -303,119 +275,6 @@ private data class ConfettiParticle(
     val rotation: Float
 )
 
-@Composable
-fun StickerAwardAnimation(
-    stickerImageUrl: String,
-    onAnimationComplete: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val context = LocalContext.current
-    val durationMs = remember { Random.nextInt(800, 1201) }
-    val stickerSize = 72.dp
-    val cornerPadding = 12.dp
-    val density = LocalDensity.current
-
-    var startOffset by remember { mutableStateOf(Offset.Zero) }
-    var targetOffset by remember { mutableStateOf(Offset.Zero) }
-    var startFlight by remember { mutableStateOf(false) }
-    var settled by remember { mutableStateOf(false) }
-
-    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
-        val widthPx = constraints.maxWidth.toFloat()
-        val heightPx = constraints.maxHeight.toFloat()
-        val sizePx = with(density) { stickerSize.toPx() }
-        val paddingPx = with(density) { cornerPadding.toPx() }
-
-        LaunchedEffect(widthPx, heightPx, sizePx, paddingPx) {
-            if (widthPx > 0f && heightPx > 0f && sizePx > 0f) {
-                startOffset = Offset(
-                    x = (widthPx - sizePx) / 2f,
-                    y = (heightPx - sizePx) / 2f
-                )
-                targetOffset = Offset(
-                    x = widthPx - sizePx - paddingPx,
-                    y = paddingPx
-                )
-                startFlight = true
-                settled = false
-            }
-        }
-
-        val animatedOffset by animateOffsetAsState(
-            targetValue = if (startFlight) targetOffset else startOffset,
-            animationSpec = tween(durationMillis = durationMs, easing = LinearOutSlowInEasing),
-            label = "stickerOffset"
-        )
-
-        val flightScale by animateFloatAsState(
-            targetValue = 1f,
-            animationSpec = keyframes {
-                durationMillis = durationMs
-                0.5f at 0
-                1.2f at (durationMs * 0.6f).toInt()
-                1f at durationMs
-            },
-            label = "stickerScale"
-        )
-
-        val animatedAlpha by animateFloatAsState(
-            targetValue = if (startFlight) 1f else 0f,
-            animationSpec = tween(durationMillis = durationMs / 3, easing = LinearOutSlowInEasing),
-            label = "stickerAlpha"
-        )
-
-        val animatedRotation by animateFloatAsState(
-            targetValue = if (startFlight) 360f else 0f,
-            animationSpec = tween(durationMillis = durationMs, easing = LinearEasing),
-            label = "stickerRotation"
-        )
-
-        LaunchedEffect(startFlight) {
-            if (startFlight) {
-                delay(durationMs.toLong())
-                settled = true
-                onAnimationComplete()
-            }
-        }
-
-        val scale = if (settled) 0.6f else flightScale
-        val rotation = if (settled) 360f else animatedRotation
-        val alpha = if (settled) 1f else animatedAlpha
-
-        val resId = remember(stickerImageUrl) {
-            val resolved = context.resources.getIdentifier(
-                stickerImageUrl,
-                "drawable",
-                context.packageName
-            )
-            if (resolved != 0) resolved else context.resources.getIdentifier(
-                "part_mouth_happy",
-                "drawable",
-                context.packageName
-            )
-        }
-
-        Image(
-            painter = painterResource(id = resId),
-            contentDescription = null,
-            contentScale = ContentScale.Fit,
-            modifier = Modifier
-                .offset {
-                    IntOffset(
-                        x = animatedOffset.x.roundToInt(),
-                        y = animatedOffset.y.roundToInt()
-                    )
-                }
-                .size(stickerSize)
-                .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                    rotationZ = rotation
-                    this.alpha = alpha
-                }
-        )
-    }
-}
 
 @Composable
 private fun PromptHeader(round: GameRound, modifier: Modifier = Modifier) {

@@ -10,6 +10,8 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -21,9 +23,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.window.Popup
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -36,10 +37,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.emogrow.R
 import com.example.emogrow.data.remote.dto.journal.DiaryResponse
+import com.example.emogrow.data.remote.dto.journal.EmotionResponse
 import com.example.emogrow.features.journal.viewmodel.JournalPhase
-import com.example.emogrow.features.journal.viewmodel.JournalUiState
 import com.example.emogrow.features.journal.viewmodel.JournalViewModel
-import com.example.emogrow.features.journal.viewmodel.EmotionSeed
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -112,7 +112,7 @@ fun JournalScreen(
             title = { Text("Chi tiết cảm xúc") },
             text = {
                 Column {
-                    Text("Cảm xúc: ${selectedDiary?.emotion_emoji} ${selectedDiary?.emotion_name}", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Text("Cảm xúc: ${selectedDiary?.emotion_emoji ?: "❓"} ${selectedDiary?.emotion_name ?: "Không xác định"}", fontSize = 18.sp, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(8.dp))
                     Text("Ngày: ${selectedDiary?.diary_date ?: selectedDiary?.created_at}")
                     if (!selectedDiary?.feeling_note.isNullOrEmpty()) {
@@ -187,7 +187,7 @@ fun JournalScreen(
                     contentPadding = PaddingValues(horizontal = 16.dp)
                 ) {
                     items(uiState.pastJournals) { diary ->
-                        PlantThumbnail(diary.emotion_emoji) {
+                        PlantThumbnail(diary.emotion_emoji ?: "🌱") {
                             selectedDiary = diary
                         }
                     }
@@ -240,7 +240,10 @@ fun JournalScreen(
                                             SproutedPlant(onPositioned = { potPosition = it })
                                             // Hiệu ứng nước rơi
                                             if (showWaterDrops) {
-                                                Box(modifier = Modifier.requiredSize(0.dp), contentAlignment = Alignment.TopCenter) {
+                                                Box(
+                                                    modifier = Modifier.requiredSize(180.dp), // Fix clipping by ensuring it's not 0 size
+                                                    contentAlignment = Alignment.TopCenter
+                                                ) {
                                                     WaterDropsAnimation(onAnimationEnd = {
                                                         showWaterDrops = false
                                                         viewModel.onWaterDropped()
@@ -276,7 +279,7 @@ fun JournalScreen(
                             }
 
                             if (uiState.phase == JournalPhase.HEALTHY) {
-                                WateringCanRecordButton(
+                                JournalRecordButton(
                                     isRecording = uiState.isRecording,
                                     onClick = { viewModel.toggleRecording() }
                                 )
@@ -286,7 +289,7 @@ fun JournalScreen(
                                         onClick = { viewModel.finishAndReset(childId) },
                                         colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
                                     ) {
-                                        Text("Kết thúc", color = Color.White)
+                                        Text("Kết thúc", color = Color.White, fontSize = 11.sp)
                                     }
                                 }
                             }
@@ -294,7 +297,7 @@ fun JournalScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 // 3. Khay hạt mầm ở dưới cùng
                 if (uiState.phase == JournalPhase.PLANTING) {
@@ -311,7 +314,10 @@ fun JournalScreen(
 
 @Composable
 fun MascotMessage(message: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.offset(y = (-40).dp) 
+    ) {
         Box(
             modifier = Modifier
                 .background(Color.White.copy(alpha = 0.9f), RoundedCornerShape(12.dp))
@@ -319,7 +325,7 @@ fun MascotMessage(message: String) {
         ) {
             Text(message, fontSize = 11.sp, textAlign = TextAlign.Center, lineHeight = 14.sp)
         }
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(12.dp))
         Image(
             painter = painterResource(id = R.drawable.mascot),
             contentDescription = "Mascot",
@@ -351,7 +357,7 @@ fun Pot(onPositioned: (Offset) -> Unit = {}) {
         painter = painterResource(id = R.drawable.pot),
         contentDescription = "Pot",
         modifier = Modifier
-            .size(180.dp)
+            .size(120.dp)
             .onGloballyPositioned { onPositioned(it.positionInRoot()) }
     )
 }
@@ -414,55 +420,70 @@ fun RecordingStatus() {
 }
 
 @Composable
-fun WateringCanRecordButton(isRecording: Boolean, onClick: () -> Unit) {
+fun JournalRecordButton(isRecording: Boolean, onClick: () -> Unit) {
     Box(
         modifier = Modifier
-            .size(100.dp)
-            .background(if (isRecording) Color.Red.copy(alpha = 0.2f) else Color.Transparent, CircleShape)
-            .clickable(enabled = !isRecording) { onClick() },
+            .size(80.dp)
+            .background(if (isRecording) Color.Red.copy(alpha = 0.4f) else Color.White.copy(alpha = 0.2f), CircleShape)
+            .clickable { onClick() },
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            if (isRecording) {
-                Text("🎤", fontSize = 48.sp)
-            } else {
-                Image(
-                    painter = painterResource(id = R.drawable.watering_can),
-                    contentDescription = "Water Can",
-                    modifier = Modifier.requiredSize(70.dp)
-                )
-            }
-            if (!isRecording) {
-                Text("Ghi âm", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
-            }
+            Text("🎤", fontSize = 36.sp)
+            Text(
+                if (isRecording) "Đang ghi" else "Ghi âm",
+                fontSize = 10.sp,
+                color = if (isRecording) Color.Red else Color.White,
+                fontWeight = FontWeight.Bold
+            )
         }
     }
 }
 
 @Composable
-fun SeedTray(emotions: List<EmotionSeed>, onDrop: (EmotionSeed) -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(
-            modifier = Modifier
-                .background(Color.Black.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
-                .padding(horizontal = 12.dp, vertical = 4.dp)
-        ) {
-            Text("Kéo hạt mầm vào chậu", style = MaterialTheme.typography.bodySmall, color = Color.White, fontWeight = FontWeight.Bold)
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(8.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            emotions.forEach { emotion ->
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    DraggableItem(
-                        emoji = emotion.emoji,
-                        isFromSide = false,
-                        onDrop = { onDrop(emotion) }
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(emotion.name, fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold)
+fun SeedTray(emotions: List<EmotionResponse>, onDrop: (EmotionResponse) -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(130.dp)
+            .background(Color.Black.copy(alpha = 0.2f), RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+            .padding(vertical = 10.dp, horizontal = 16.dp)
+    ) {
+        if (emotions.isNotEmpty()) {
+            val chunkedEmotions = emotions.chunked(maxOf(1, (emotions.size + 1) / 2))
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                chunkedEmotions.forEach { rowEmotions ->
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        rowEmotions.forEach { emotion ->
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.width(55.dp)
+                            ) {
+                                DraggableItem(
+                                    emoji = emotion.emoji ?: "🌱",
+                                    isFromSide = false,
+                                    onDrop = { onDrop(emotion) }
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = emotion.name,
+                                    fontSize = 10.sp,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    textAlign = TextAlign.Center,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -480,7 +501,7 @@ fun DraggableWateringCan(onDrop: () -> Unit) {
             Image(
                 painter = painterResource(id = R.drawable.watering_can),
                 contentDescription = "Water Can",
-                modifier = Modifier.requiredSize(70.dp)
+                modifier = Modifier.requiredSize(60.dp)
             )
         }
         Text("Tưới nước", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
@@ -507,7 +528,7 @@ fun WaterDropsAnimation(onAnimationEnd: () -> Unit) {
     }
 
     Box(
-        modifier = Modifier.requiredSize(0.dp).offset(y = (-80).dp),
+        modifier = Modifier.requiredSize(180.dp), // Prevent 0 size clipping
         contentAlignment = Alignment.TopCenter
     ) {
         animatables.forEachIndexed { index, animatable ->
@@ -569,9 +590,23 @@ fun DraggableItem(
     var offset by remember { mutableStateOf(Offset.Zero) }
     var isDragging by remember { mutableStateOf(false) }
 
+    val itemContent = @Composable {
+        Box(
+            modifier = Modifier
+                .size(45.dp)
+                .background(if (isDragging) Color.LightGray.copy(alpha = 0.5f) else Color.Transparent, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            if (content != null) {
+                content()
+            } else {
+                Text(emoji, fontSize = 24.sp)
+            }
+        }
+    }
+
     Box(
         modifier = Modifier
-            .offset { IntOffset(offset.x.roundToInt(), offset.y.roundToInt()) }
             .pointerInput(Unit) {
                 detectDragGestures(
                     onDragStart = { isDragging = true },
@@ -594,14 +629,16 @@ fun DraggableItem(
                     }
                 )
             }
-            .size(70.dp)
-            .background(if (isDragging) Color.LightGray.copy(alpha = 0.5f) else Color.Transparent, CircleShape),
-        contentAlignment = Alignment.Center
     ) {
-        if (content != null) {
-            content()
-        } else {
-            Text(emoji, fontSize = 30.sp)
+        itemContent()
+        
+        if (isDragging) {
+            Popup(
+                alignment = Alignment.TopStart,
+                offset = IntOffset(offset.x.roundToInt(), offset.y.roundToInt())
+            ) {
+                itemContent()
+            }
         }
     }
 }

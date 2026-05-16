@@ -3,6 +3,7 @@ package com.example.emogrow.features.review.viewmodel
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.emogrow.data.repository.ReviewRepository
 import com.example.emogrow.features.review.data.DiaryBead
 import com.example.emogrow.features.review.data.ReviewDataProvider
 import com.example.emogrow.features.review.model.Book
@@ -93,7 +94,8 @@ private fun createEmotionBubble(entry: com.example.emogrow.features.review.model
 }
 
 class ReviewSharedViewModel(
-    private val childId: Int
+    private val childId: Int,
+    private val repository: ReviewRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ReviewSharedUiState())
@@ -124,16 +126,73 @@ class ReviewSharedViewModel(
     }
 
     private fun loadReviewData(viewDate: LocalDate) {
-        val monthDiaries = ReviewDataProvider.getDiaries(childId, viewDate)
-        val beads = ReviewDataProvider.getBeadsForDiaries(monthDiaries).map { it.toEmotionBead() }
-        val bubbles = allEmotions.map { createEmotionBubble(it) }
-        _shelves.value = createShelves(monthDiaries)
-        _uiState.update {
-            it.copy(
-                categories = bubbles,
-                pastBeads = beads,
-                diaries = monthDiaries
-            )
+        viewModelScope.launch {
+            try {
+                val stats = repository.getEmotionStatistics(childId)
+                val logs = repository.getEmotionLogs(childId)
+                // Filter logs for the requested month
+                val monthLogs = logs.filter { log ->
+                    val logDate = LocalDate.parse(log.created_at.split("T")[0])
+                    logDate.year == viewDate.year && logDate.monthValue == viewDate.monthValue
+                }
+
+                // Map logs to EmotionDiary
+                val diaries = monthLogs.map { log ->
+                    val dateStr = log.created_at.split("T")[0]
+                    val emotion = allEmotions.find { it.emotionId == log.emotion_type }
+                    EmotionDiary(
+                        diaryId = log.emotion_log_id.toString(),
+                        childId = childId,
+                        emotionId = log.emotion_type,
+                        diaryDate = dateStr,
+                        seedColor = emotion?.colorCode ?: "#FFD54F",
+                        feelingNote = "Hôm nay con cảm thấy ${emotion?.name ?: log.emotion_type}."
+                    )
+                }
+
+                val beads = diaries.map { diary ->
+                    val emotion = allEmotions.find { it.emotionId == diary.emotionId }
+                    EmotionBead(
+                        id = diary.diaryId,
+                        date = diary.diaryDate,
+                        displayDate = LocalDate.parse(diary.diaryDate).format(DateTimeFormatter.ofPattern("dd/MM/yyyy")),
+                        emotionId = diary.emotionId,
+                        emoji = emotion?.emoji ?: "😊",
+                        color = try { Color(android.graphics.Color.parseColor(diary.seedColor)) } catch (e: Exception) { Color(0xFFFFD54F) },
+                        label = emotion?.name ?: "Unknown",
+                        description = diary.feelingNote,
+                        isToday = diary.diaryDate == LocalDate.now().toString()
+                    )
+                }
+
+                val bubbles = allEmotions.map { entry ->
+                    val stat = stats.distribution.find { it.emotion_type == entry.emotionId }
+                    val percentage = if (stats.total_count > 0) {
+                        "${(stat?.count ?: 0) * 100 / stats.total_count}%"
+                    } else "0%"
+                    
+                    EmotionBubble(
+                        id = entry.emotionId,
+                        emoji = entry.emoji,
+                        percentage = percentage,
+                        color = try { Color(android.graphics.Color.parseColor(entry.colorCode)) } catch (e: Exception) { Color(0xFFFFD54F) },
+                        label = entry.name,
+                        description = entry.description
+                    )
+                }
+
+                _shelves.value = createShelves(diaries)
+                _uiState.update {
+                    it.copy(
+                        categories = bubbles,
+                        pastBeads = beads,
+                        diaries = diaries
+                    )
+                }
+                updateMascotMessage()
+            } catch (e: Exception) {
+                // Handle error
+            }
         }
     }
 
@@ -361,10 +420,11 @@ class ReviewSharedViewModel(
 }
 
 class ReviewSharedViewModelFactory(
-    private val childId: Int
+    private val childId: Int,
+    private val repository: ReviewRepository
 ) : androidx.lifecycle.ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        return ReviewSharedViewModel(childId) as T
+        return ReviewSharedViewModel(childId, repository) as T
     }
 }

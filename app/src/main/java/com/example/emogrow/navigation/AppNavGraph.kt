@@ -12,6 +12,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.emogrow.data.repository.ReviewRepository
 import com.example.emogrow.features.auth.ui.LoginScreen
 import com.example.emogrow.features.auth.ui.RegisterScreen
 import com.example.emogrow.features.auth.viewmodel.AuthViewModel
@@ -36,6 +37,7 @@ fun AppNavGraph(
     authFactory: AuthViewModelFactory,
     childFactory: ChildViewModelFactory,
     emotionFactory: EmotionViewModelFactory,
+    reviewRepository: ReviewRepository
 ) {
     val navController = rememberNavController()
 
@@ -144,7 +146,7 @@ fun AppNavGraph(
                 }
                 val sharedViewModel: ReviewSharedViewModel = viewModel(
                     viewModelStoreOwner = parentEntry,
-                    factory = ReviewSharedViewModelFactory(childId)
+                    factory = ReviewSharedViewModelFactory(childId, reviewRepository)
                 )
 
                 ReviewScreen(
@@ -188,7 +190,7 @@ fun AppNavGraph(
                 }
                 val sharedViewModel: ReviewSharedViewModel = viewModel(
                     viewModelStoreOwner = parentEntry,
-                    factory = ReviewSharedViewModelFactory(childId)
+                    factory = ReviewSharedViewModelFactory(childId, reviewRepository)
                 )
 
                 LaunchedEffect(emotionId, date) {

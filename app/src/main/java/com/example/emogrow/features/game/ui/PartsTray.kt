@@ -35,6 +35,7 @@ fun PartsTray(
     availableParts: List<FacePart>,
     placedPartIds: Set<String>,
     isDragging: Boolean,
+    returningPartKeys: Set<String>,
     onDragStart: (FacePart, Offset) -> Unit,
     onDragMove: (Offset) -> Unit,
     onDragEnd: () -> Unit,
@@ -90,6 +91,7 @@ fun PartsTray(
                         DraggablePart(
                             part = topPart,
                             isPlaced = topPlaced,
+                            isReturning = topPart.uniqueKey in returningPartKeys,
                             onDragStart = onDragStart,
                             onDragMove = onDragMove,
                             onDragEnd = onDragEnd,
@@ -101,6 +103,7 @@ fun PartsTray(
                             DraggablePart(
                                 part = bottomPart,
                                 isPlaced = bottomPlaced,
+                                isReturning = bottomPart.uniqueKey in returningPartKeys,
                                 onDragStart = onDragStart,
                                 onDragMove = onDragMove,
                                 onDragEnd = onDragEnd,

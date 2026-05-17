@@ -6,6 +6,10 @@ import android.speech.tts.TextToSpeech
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,12 +21,14 @@ data class GameUiState(
     val placedParts: Map<ZoneId, FacePart?> = ZoneId.entries.associateWith { null },
     val isCompleted: Boolean = false,
     val draggedPart: FacePart? = null,
-    val dragPosition: Offset = Offset.Zero
+    val dragPosition: Offset = Offset.Zero,
+    val wrongZones: Set<ZoneId> = emptySet()
 )
 
 class GameViewModel(application: Application) : AndroidViewModel(application) {
     private var currentRoundIndex = 0
     private var eventListener: GameEventListener? = null
+    private var wrongPartsJob: Job? = null
 
     private val snapThresholdPx = 80f * Resources.getSystem().displayMetrics.density
 
@@ -54,40 +60,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     val replayCount: StateFlow<Int> = _replayCount.asStateFlow()
 
     // TTS
-    private var tts: TextToSpeech? = null
-    private var isTtsReady = false
     private var pendingIntroEmotion: EmotionType? = null
 
-    init {
-        // Khởi tạo TTS để đọc hướng dẫn bằng tiếng Việt.
-        tts = TextToSpeech(application) { status ->
-            if (status == TextToSpeech.SUCCESS) {
-                val viVnLocale = Locale.forLanguageTag("vi-VN")
-                val viLocale = Locale("vi")
-                val primaryResult = tts?.setLanguage(viVnLocale) ?: TextToSpeech.LANG_NOT_SUPPORTED
-                val resolvedResult = if (
-                    primaryResult == TextToSpeech.LANG_MISSING_DATA ||
-                    primaryResult == TextToSpeech.LANG_NOT_SUPPORTED
-                ) {
-                    tts?.setLanguage(viLocale) ?: TextToSpeech.LANG_NOT_SUPPORTED
-                } else {
-                    primaryResult
-                }
-
-                isTtsReady = resolvedResult != TextToSpeech.LANG_MISSING_DATA &&
-                    resolvedResult != TextToSpeech.LANG_NOT_SUPPORTED
-                if (isTtsReady) {
-                    tts?.setSpeechRate(1.15f)
-                    tts?.setPitch(1.5f)
-                    // Đọc tự động nếu trước đó đã yêu cầu mà TTS chưa sẵn sàng.
-                    pendingIntroEmotion?.let { emotion ->
-                        pendingIntroEmotion = null
-                        speakRoundIntro(emotion)
-                    }
-                }
-            }
-        }
-    }
 
     fun setEventListener(listener: GameEventListener?) {
         eventListener = listener
@@ -98,6 +72,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         if (index == currentRoundIndex && _uiState.value.currentRound == sampleRounds[index]) {
             return
         }
+        cancelWrongPartsJob()
         currentRoundIndex = index
         _uiState.value = GameUiState(
             currentRound = sampleRounds[currentRoundIndex].copy(
@@ -182,6 +157,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 dragPosition = Offset.Zero
             )
             checkCompletion()
+            checkWrongParts()
         } else {
             _uiState.value = state.copy(
                 draggedPart = null,
@@ -195,13 +171,16 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val updated = state.placedParts.toMutableMap()
         updated[zoneId] = null
 
+        cancelWrongPartsJob()
         _uiState.value = state.copy(
             placedParts = updated,
-            isCompleted = false
+            isCompleted = false,
+            wrongZones = emptySet()
         )
     }
 
     fun goToNextRound() {
+        cancelWrongPartsJob()
         currentRoundIndex = (currentRoundIndex + 1) % sampleRounds.size
         val nextRound = sampleRounds[currentRoundIndex].copy(
             availableParts = sampleRounds[currentRoundIndex].availableParts.shuffled()
@@ -211,12 +190,14 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun replayCurrentRound() {
+        cancelWrongPartsJob()
         val state = _uiState.value
         _uiState.value = state.copy(
             placedParts = ZoneId.entries.associateWith { null },
             isCompleted = false,
             draggedPart = null,
-            dragPosition = Offset.Zero
+            dragPosition = Offset.Zero,
+            wrongZones = emptySet()
         )
         _replayCount.update { it + 1 }
     }
@@ -240,6 +221,48 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         } else {
             _uiState.value = state.copy(isCompleted = false)
         }
+    }
+
+    private fun checkWrongParts() {
+        val currentState = _uiState.value
+        val requiredZones = ZoneId.entries.filter { currentState.currentRound.targetFace.containsKey(it) }
+        val allFilled = requiredZones.all { currentState.placedParts[it] != null }
+
+        if (!allFilled) return
+
+        val wrong = ZoneId.entries.filter { zoneId ->
+            val placed = currentState.placedParts[zoneId]?.id
+            val target = currentState.currentRound.targetFace[zoneId]
+            target != null && placed != target
+        }.toSet()
+
+        if (wrong.isEmpty()) {
+            // Nếu ghép đúng hết rồi thì dọn trạng thái sai còn sót từ lần thử trước.
+            cancelWrongPartsJob()
+            _uiState.update { it.copy(wrongZones = emptySet()) }
+            return
+        }
+
+        // Đánh dấu các zone ghép sai để UI vẽ viền đỏ và rung nhẹ.
+        _uiState.update { it.copy(wrongZones = wrong) }
+
+        cancelWrongPartsJob()
+        wrongPartsJob = viewModelScope.launch {
+            delay(800)
+            _uiState.update { state ->
+                val newPlaced = state.placedParts.toMutableMap()
+                wrong.forEach { zoneId -> newPlaced[zoneId] = null }
+                state.copy(
+                    placedParts = newPlaced,
+                    wrongZones = emptySet()
+                )
+            }
+        }
+    }
+
+    private fun cancelWrongPartsJob() {
+        wrongPartsJob?.cancel()
+        wrongPartsJob = null
     }
 
     private fun Offset.getDistanceTo(other: Offset): Float {
@@ -268,53 +291,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // Đọc to hướng dẫn mỗi khi bắt đầu màn chơi.
-    fun speakRoundIntro(emotion: EmotionType) {
-        if (!isTtsReady) {
-            pendingIntroEmotion = emotion
-            return
-        }
-        val text = buildIntroText(emotion)
-        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "round_intro")
-    }
-
-    fun stopSpeaking() {
-        // Dừng giọng đọc ngay khi người dùng thoát màn chơi.
-        tts?.stop()
-    }
-
-    private fun buildIntroText(emotion: EmotionType): String {
-        val emotionName = when (emotion) {
-            EmotionType.HAPPY -> "vui vẻ"
-            EmotionType.SAD -> "buồn bã"
-            EmotionType.ANGRY -> "tức giận"
-            EmotionType.SURPRISED -> "bất ngờ"
-            EmotionType.SCARED -> "sợ hãi"
-            EmotionType.WORRIED -> "lo lắng"
-            EmotionType.SHY -> "xấu hổ"
-            EmotionType.PROUD -> "tự hào"
-            EmotionType.LOVE -> "yêu thương"
-            EmotionType.CALM -> "bình tĩnh"
-            EmotionType.TIRED -> "mệt mỏi"
-            EmotionType.LONELY -> "cô đơn"
-            EmotionType.CONFUSED -> "bối rối"
-            EmotionType.JEALOUS -> "ghen tị"
-            EmotionType.EXCITED -> "phấn khích"
-        }
-        return "Trong màn chơi này, bé hãy ghép một khuôn mặt $emotionName nhé! Cố lên nào!"
-    }
-
-    override fun onCleared() {
-        pendingIntroEmotion = null
-        tts?.stop()
-        tts?.shutdown()
-        super.onCleared()
-    }
 
     companion object {
-
-
-
 
         private fun matchesGroupId(groupId: String, partId: String): Boolean {
             val baseId = partId.removeSuffix("_left").removeSuffix("_right")
@@ -567,8 +545,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     FacePart("eyebrows_shy_right", PartType.EYEBROW, EmotionType.LOVE, "🥰", "Lông mày phải"),
                     FacePart("nose_basic", PartType.NOSE, null, "👃", "Mũi"),
                     FacePart("mouth_shy", PartType.MOUTH, EmotionType.LOVE, "🥰", "Miệng"),
-                    FacePart("blush_shy", PartType.CHEEK, EmotionType.LOVE, "🥰", "Má trái", EyeSide.LEFT),
-                    FacePart("blush_shy", PartType.CHEEK, EmotionType.LOVE, "🥰", "Má phải", EyeSide.RIGHT),
+                    FacePart("blush_shy", PartType.CHEEK, EmotionType.LOVE, "🥰", "Má", EyeSide.LEFT),
+                    FacePart("blush_shy", PartType.CHEEK, EmotionType.LOVE, "🥰", "Má", EyeSide.RIGHT),
                             // Distractor
                             FacePart("eye_sad_left", PartType.EYE, EmotionType.SAD, "😢", "Mắt trái"),
                     FacePart("eye_worried_right", PartType.EYE, EmotionType.WORRIED, "😟", "Mắt phải"),
@@ -666,7 +644,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     FacePart("eye_happy_right", PartType.EYE, EmotionType.HAPPY, "😊", "Mắt phải"),
                     FacePart("mouth_surprised", PartType.MOUTH, EmotionType.SURPRISED, "😲", "Miệng"),
                     FacePart("mouth_proud", PartType.MOUTH, EmotionType.PROUD, "😤", "Miệng"),
-                    FacePart("nose_water", PartType.NOSE, null, "💧", "Mũi"),
+                    FacePart("nose_basic", PartType.NOSE, null, "👃", "Mũi"),
 
                     ),
                 isReview = false
@@ -684,8 +662,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     ZoneId.MOUTH to "mouth_confused"
                 ),
                 availableParts = listOf(
-                    FacePart("eye_confused", PartType.EYE, EmotionType.CONFUSED, "😵‍💫", "Mắt trái", EyeSide.LEFT),
-                    FacePart("eye_confused", PartType.EYE, EmotionType.CONFUSED, "😵‍💫", "Mắt phải", EyeSide.RIGHT),
+                    FacePart("eye_confused", PartType.EYE, EmotionType.CONFUSED, "😵‍💫", "Mắt", EyeSide.NONE),
+                    FacePart("eye_confused", PartType.EYE, EmotionType.CONFUSED, "😵‍💫", "Mắt", EyeSide.NONE),
                     FacePart("eyebrows_confused_left", PartType.EYEBROW, EmotionType.CONFUSED, "😵‍💫", "Lông mày trái"),
                     FacePart("eyebrows_confused_right", PartType.EYEBROW, EmotionType.CONFUSED, "😵‍💫", "Lông mày phải"),
                     FacePart("nose_basic", PartType.NOSE, null, "👃", "Mũi"),
@@ -735,7 +713,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             ),
             GameRound(
                 emotion = EmotionType.EXCITED,
-                promptText = "Ghép mặt PHẤN KHÍCH nhé!",
+                promptText = "Ghép mặt PHẤN KHÍCH!",
                 promptEmoji = "🤩",
                 targetFace = mapOf(
                     ZoneId.LEFT_EYE to "part_excited_left_eye",
@@ -754,8 +732,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     FacePart("part_eyebrows_shy_right", PartType.EYEBROW, EmotionType.EXCITED, "🤩", "Lông mày phải"),
                     FacePart("part_nose_normal", PartType.NOSE, null, "👃", "Mũi"),
                     FacePart("part_excited_mouth", PartType.MOUTH, EmotionType.EXCITED, "🤩", "Miệng"),
-                    FacePart("part_blush_excited", PartType.CHEEK, EmotionType.EXCITED, "🤩", "Má trái", EyeSide.LEFT),
-                    FacePart("part_blush_excited", PartType.CHEEK, EmotionType.EXCITED, "🤩", "Má phải", EyeSide.RIGHT),
+                    FacePart("part_blush_excited", PartType.CHEEK, EmotionType.EXCITED, "🤩", "Má", EyeSide.LEFT),
+                    FacePart("part_blush_excited", PartType.CHEEK, EmotionType.EXCITED, "🤩", "Má", EyeSide.RIGHT),
                     // Distractor
                     FacePart("eye_happy_left", PartType.EYE, EmotionType.HAPPY, "😊", "Mắt trái", EyeSide.LEFT),
                     FacePart("eye_happy_right", PartType.EYE, EmotionType.HAPPY, "😊", "Mắt phải", EyeSide.RIGHT),
@@ -763,7 +741,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     FacePart("eye_love_right", PartType.EYE, EmotionType.LOVE, "🥰", "Mắt phải", EyeSide.RIGHT),
                     FacePart("mouth_worried", PartType.MOUTH, EmotionType.HAPPY, "😄", "Miệng"),
                     FacePart("mouth_shy", PartType.MOUTH, EmotionType.SHY, "😳", "Miệng"),
-                    FacePart("nose_water", PartType.NOSE, null, "💧", "Mũi")
+                    FacePart("nose_water", PartType.NOSE, null, "💧", "Mũi"),
+                    FacePart("blush_shy", PartType.CHEEK, EmotionType.LOVE, "🥰", "Má", EyeSide.LEFT),
+                    FacePart("blush_shy", PartType.CHEEK, EmotionType.LOVE, "🥰", "Má", EyeSide.RIGHT),
+
 
                     ),
                 isReview = false

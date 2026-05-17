@@ -45,9 +45,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.systemBarsPadding
-import androidx.compose.foundation.border
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 import kotlin.random.Random
@@ -57,6 +55,8 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.activity.compose.BackHandler
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
@@ -72,10 +72,13 @@ fun GameScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val replayCount by viewModel.replayCount.collectAsState()
+    val haptic = LocalHapticFeedback.current
 
     var faceCanvasPosition by remember { mutableStateOf(Offset.Zero) }
     var faceCanvasSize by remember { mutableStateOf(Size.Zero) }
     var showExitDialog by remember { mutableStateOf(false) }
+    var pendingReturnPartKeys by remember { mutableStateOf(emptySet<String>()) }
+    var returnAnimationPartKeys by remember { mutableStateOf(emptySet<String>()) }
 
     val placedPartKeys = remember(uiState.placedParts) {
         uiState.placedParts.values
@@ -95,11 +98,34 @@ fun GameScreen(
         showConfetti = false
     }
 
-    // Đọc to hướng dẫn mỗi khi vào màn mới hoặc chơi lại.
-    LaunchedEffect(uiState.currentRound.emotion, replayCount) {
-        delay(500)
-        viewModel.speakRoundIntro(uiState.currentRound.emotion)
+    LaunchedEffect(uiState.wrongZones) {
+        if (uiState.wrongZones.isNotEmpty()) {
+            // Ghi nhận các bộ phận vừa ghép sai để trả animation về khay sau khi delay kết thúc.
+            pendingReturnPartKeys = uiState.wrongZones.mapNotNull { zoneId ->
+                uiState.placedParts[zoneId]?.uniqueKey
+            }.toSet()
+
+            // Rung nhẹ 2 lần để báo cho bé biết đang ghép sai.
+            if (pendingReturnPartKeys.isNotEmpty()) {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                delay(150)
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            }
+        } else if (pendingReturnPartKeys.isNotEmpty()) {
+            // Khi wrongZones được xóa, kích hoạt hiệu ứng bật lại trong khay cho các part vừa bị trả về.
+            returnAnimationPartKeys = pendingReturnPartKeys
+            pendingReturnPartKeys = emptySet()
+        }
     }
+
+    LaunchedEffect(returnAnimationPartKeys) {
+        if (returnAnimationPartKeys.isNotEmpty()) {
+            delay(420)
+            returnAnimationPartKeys = emptySet()
+        }
+    }
+
+
 
     LaunchedEffect(uiState.isCompleted) {
         if (uiState.isCompleted) {
@@ -113,7 +139,6 @@ fun GameScreen(
         BackHandler { showExitDialog = false }
     } else {
         BackHandler {
-            viewModel.stopSpeaking()
             showExitDialog = true
         }
     }
@@ -131,6 +156,7 @@ fun GameScreen(
         ) {
             PromptHeader(
                 round = uiState.currentRound,
+                onBackClick = { showExitDialog = true },
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = 136.dp)
@@ -156,6 +182,7 @@ fun GameScreen(
                         placedParts = uiState.placedParts,
                         draggedPart = uiState.draggedPart,
                         dragPosition = uiState.dragPosition,
+                        wrongZones = uiState.wrongZones,
                         requiredZones = uiState.currentRound.targetFace.keys,
                         onZonePositioned = { zoneId, center ->
                             viewModel.updateZoneCenter(zoneId, center)
@@ -171,6 +198,7 @@ fun GameScreen(
                 availableParts = uiState.currentRound.availableParts,
                 placedPartIds = placedPartKeys,
                 isDragging = uiState.draggedPart != null,
+                returningPartKeys = returnAnimationPartKeys,
                 onDragStart = { part, position ->
                     viewModel.startDrag(part)
                     viewModel.updateDragPosition(position)
@@ -209,35 +237,9 @@ fun GameScreen(
             )
         }
 
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(8.dp)
-                .size(44.dp)
-                .shadow(elevation = 10.dp, shape = CircleShape)
-                .border(width = 2.dp, color = Color.Black, shape = CircleShape)
-                .background(color = Color.White.copy(alpha = 0.95f), shape = CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            IconButton(
-                onClick = {
-                    viewModel.stopSpeaking()
-                    showExitDialog = true
-                },
-                modifier = Modifier.fillMaxSize()
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Quay lai",
-                    tint = Color(0xFF2D2D2D)
-                )
-            }
-        }
-
         if (showExitDialog) {
             ConfirmExitDialog(
                 onConfirmExit = {
-                    viewModel.stopSpeaking()
                     showExitDialog = false
                     onExit()
                 },
@@ -358,7 +360,11 @@ private data class ConfettiParticle(
 
 
 @Composable
-private fun PromptHeader(round: GameRound, modifier: Modifier = Modifier) {
+private fun PromptHeader(
+    round: GameRound,
+    onBackClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     val gradient = GameDesign.emotionGradient(round.emotion)
     val darkerShade = gradient.last().copy(
         red = (gradient.last().red * 0.7f).coerceIn(0f, 1f),
@@ -367,7 +373,7 @@ private fun PromptHeader(round: GameRound, modifier: Modifier = Modifier) {
     )
 
     Box(
-        modifier = modifier.padding(horizontal = 4.dp, vertical = 12.dp),
+        modifier = modifier.padding(horizontal = 0.dp, vertical = 12.dp),
         contentAlignment = Alignment.Center
     ) {
         Box(
@@ -390,7 +396,7 @@ private fun PromptHeader(round: GameRound, modifier: Modifier = Modifier) {
                     brush = Brush.linearGradient(gradient),
                     shape = RoundedCornerShape(28.dp)
                 )
-                .padding(horizontal = 24.dp, vertical = 14.dp),
+                .padding(horizontal = 12.dp, vertical = 14.dp),
             contentAlignment = Alignment.Center
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -421,6 +427,21 @@ private fun PromptHeader(round: GameRound, modifier: Modifier = Modifier) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 2.dp, bottom = 4.dp)
+                )
+            }
+
+            IconButton(
+                onClick = onBackClick,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    // offset âm để icon sát mép trái của box
+                    .offset(x = (-12).dp, y = 0.dp)
+                    .size(36.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Quay lại",
+                    tint = Color.White
                 )
             }
         }

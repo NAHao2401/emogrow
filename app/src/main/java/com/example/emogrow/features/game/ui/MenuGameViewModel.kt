@@ -19,13 +19,15 @@ data class MenuGameUiState(
 )
 
 class MenuGameViewModel(
-    private val albumManager: AlbumManager
+    private val albumManager: AlbumManager,
+    private val childId: Int
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(MenuGameUiState())
     val uiState: StateFlow<MenuGameUiState> = _uiState.asStateFlow()
 
     init {
         viewModelScope.launch {
+            albumManager.loadLevelsForChild(childId)
             albumManager.getAllLevels().collect { levels ->
                 _uiState.value = MenuGameUiState(
                     levels = levels,
@@ -41,7 +43,8 @@ class MenuGameViewModel(
 }
 
 class MenuGameViewModelFactory(
-    private val context: Context
+    private val context: Context,
+    private val childId: Int
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (!modelClass.isAssignableFrom(MenuGameViewModel::class.java)) {
@@ -49,6 +52,6 @@ class MenuGameViewModelFactory(
         }
         val albumManager = AlbumManager.getInstance(context)
         @Suppress("UNCHECKED_CAST")
-        return MenuGameViewModel(albumManager) as T
+        return MenuGameViewModel(albumManager, childId) as T
     }
 }

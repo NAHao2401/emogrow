@@ -1,29 +1,21 @@
 package com.example.emogrow.data.repository
 
 import android.content.Context
-import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
+import com.example.emogrow.data.local.TokenManager
 import com.example.emogrow.data.remote.api.EmotionApi
 import com.example.emogrow.data.remote.api.RetrofitInstance
 import com.example.emogrow.data.remote.dto.EmotionResponse
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-
-private val Context.albumDataStore by preferencesDataStore(name = "emotion_levels")
 
 data class EmotionLevel(
     val id: Int,
@@ -38,13 +30,12 @@ data class EmotionLevel(
 )
 
 class AlbumManager private constructor(
-    private val context: Context,
+    private val childRepository: ChildRepository,
     private val emotionApi: EmotionApi
 ) {
-    private val appContext = context.applicationContext
     private val mutex = Mutex()
-    private val gson = Gson()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var activeChildId: Int? = null
 
     private val _levels = MutableStateFlow<List<EmotionLevel>>(emptyList())
     val levels: StateFlow<List<EmotionLevel>> = _levels.asStateFlow()
@@ -57,33 +48,19 @@ class AlbumManager private constructor(
         .stateIn(scope, SharingStarted.Eagerly, 0 to 0)
 
     companion object {
-        private val LEVELS_KEY = stringPreferencesKey("levels_json")
-
         @Volatile
         private var instance: AlbumManager? = null
 
         fun getInstance(context: Context): AlbumManager {
             return instance ?: synchronized(this) {
                 instance ?: AlbumManager(
-                    context = context,
+                    childRepository = ChildRepository(
+                        childApi = RetrofitInstance.childApi,
+                        tokenManager = TokenManager(context.applicationContext)
+                    ),
                     emotionApi = RetrofitInstance.emotionApi
                 ).also { instance = it }
             }
-        }
-    }
-
-    init {
-        scope.launch {
-            val cached = loadFromCache()
-            if (cached.isNotEmpty()) {
-                _levels.value = cached.sortedBy { it.id }
-            } else {
-                val seeded = seedDefaultLevels().sortedBy { it.id }
-                _levels.value = seeded
-                persistLevels(seeded)
-            }
-            ensureFirstUnlocked()
-            refreshFromApi()
         }
     }
 
@@ -93,6 +70,43 @@ class AlbumManager private constructor(
 
     fun getLevelById(id: Int): EmotionLevel? {
         return levels.value.firstOrNull { it.id == id }
+    }
+
+    suspend fun loadLevelsForChild(childId: Int, forceReload: Boolean = false) {
+        mutex.withLock {
+            if (!forceReload && activeChildId == childId && levels.value.isNotEmpty()) {
+                return
+            }
+        }
+
+        val remote = runCatching { emotionApi.getEmotions() }.getOrNull().orEmpty()
+        val baseLevels = if (remote.isNotEmpty()) {
+            remote.map { it.toEmotionLevel() }
+        } else {
+            seedDefaultLevels()
+        }.sortedBy { it.id }
+
+        val lastPassedLevel = runCatching {
+            childRepository.getGameProgress(childId).last_passed_level
+        }.getOrDefault(0)
+
+        val current = levels.value.associateBy { it.id }
+        val merged = baseLevels.map { level ->
+            val isCompleted = level.id <= lastPassedLevel
+            val isUnlocked = level.id <= lastPassedLevel + 1
+            val cached = current[level.id]
+            level.copy(
+                isUnlocked = isUnlocked,
+                isCompleted = isCompleted,
+                completedAt = if (isCompleted) cached?.completedAt else null,
+                replayCount = if (isCompleted) cached?.replayCount ?: 0 else 0
+            )
+        }
+
+        mutex.withLock {
+            activeChildId = childId
+            _levels.value = merged
+        }
     }
 
     suspend fun unlockLevel(levelId: Int): Boolean {
@@ -107,31 +121,26 @@ class AlbumManager private constructor(
             val updated = current.map { level ->
                 if (level.id == levelId) level.copy(isUnlocked = true) else level
             }
-            persistLevels(updated)
+            _levels.value = updated
             true
         }
     }
 
-    suspend fun completeLevel(levelId: Int): Boolean {
-        return mutex.withLock {
+    suspend fun completeLevel(childId: Int, levelId: Int): Boolean {
+        val canComplete = mutex.withLock {
             val current = levels.value.sortedBy { it.id }
-            val index = current.indexOfFirst { it.id == levelId }
-            if (index == -1) return@withLock false
-            val target = current[index]
-            if (!target.isUnlocked) return@withLock false
-            if (target.isCompleted) return@withLock false
-
-            val now = System.currentTimeMillis()
-            val updated = current.mapIndexed { i, level ->
-                when {
-                    i == index -> level.copy(isCompleted = true, completedAt = now)
-                    i == index + 1 -> level.copy(isUnlocked = true)
-                    else -> level
-                }
-            }
-            persistLevels(updated)
-            true
+            val target = current.firstOrNull { it.id == levelId } ?: return@withLock false
+            target.isUnlocked
         }
+        if (!canComplete) return false
+
+        val progressUpdated = runCatching {
+            childRepository.completeGameProgress(childId, levelId)
+        }.isSuccess
+        if (!progressUpdated) return false
+
+        loadLevelsForChild(childId, forceReload = true)
+        return true
     }
 
     fun canPlayLevel(levelId: Int): Boolean {
@@ -148,7 +157,7 @@ class AlbumManager private constructor(
             val updated = current.map { level ->
                 if (level.id == levelId) level.copy(replayCount = level.replayCount + 1) else level
             }
-            persistLevels(updated)
+            _levels.value = updated
             true
         }
     }
@@ -162,77 +171,14 @@ class AlbumManager private constructor(
         mutex.withLock {
             val reset = levels.value.sortedBy { it.id }.mapIndexed { index, level ->
                 level.copy(
-                    isUnlocked = index == 0,
+                    isUnlocked = false,
                     isCompleted = false,
                     completedAt = null,
                     replayCount = 0
                 )
             }
-            persistLevels(reset)
+            _levels.value = reset
         }
-    }
-
-    private suspend fun ensureFirstUnlocked() {
-        mutex.withLock {
-            val current = levels.value.sortedBy { it.id }
-            if (current.isEmpty()) return@withLock
-            val hasUnlocked = current.any { it.isUnlocked || it.isCompleted }
-            if (hasUnlocked) return@withLock
-            val updated = current.mapIndexed { index, level ->
-                if (index == 0) level.copy(isUnlocked = true) else level
-            }
-            persistLevels(updated)
-        }
-    }
-
-    private suspend fun refreshFromApi() {
-        val remote = runCatching { emotionApi.getEmotions() }.getOrNull().orEmpty()
-        if (remote.isEmpty()) return
-
-        mutex.withLock {
-            val current = levels.value
-            val mapped = remote.map { it.toEmotionLevel() }
-            val merged = mergeRemoteWithLocal(mapped, current)
-            persistLevels(merged.sortedBy { it.id })
-        }
-    }
-
-    private suspend fun loadFromCache(): List<EmotionLevel> {
-        val raw = appContext.albumDataStore.data.first()[LEVELS_KEY]
-        return decodeLevelList(raw)
-    }
-
-    private suspend fun persistLevels(levels: List<EmotionLevel>) {
-        appContext.albumDataStore.edit { preferences ->
-            preferences[LEVELS_KEY] = gson.toJson(levels)
-        }
-        _levels.value = levels
-    }
-
-    private fun mergeRemoteWithLocal(
-        remote: List<EmotionLevel>,
-        local: List<EmotionLevel>
-    ): List<EmotionLevel> {
-        if (local.isEmpty()) return remote
-        return remote.map { remoteLevel ->
-            val cached = local.firstOrNull { it.id == remoteLevel.id }
-            if (cached == null) {
-                remoteLevel
-            } else {
-                remoteLevel.copy(
-                    isUnlocked = cached.isUnlocked,
-                    isCompleted = cached.isCompleted,
-                    completedAt = cached.completedAt,
-                    replayCount = cached.replayCount
-                )
-            }
-        }
-    }
-
-    private fun decodeLevelList(raw: String?): List<EmotionLevel> {
-        if (raw.isNullOrBlank()) return emptyList()
-        val type = object : TypeToken<List<EmotionLevel>>() {}.type
-        return gson.fromJson(raw, type) ?: emptyList()
     }
 
     private fun EmotionResponse.toEmotionLevel(): EmotionLevel {
@@ -251,7 +197,7 @@ class AlbumManager private constructor(
 
     private fun seedDefaultLevels(): List<EmotionLevel> {
         return listOf(
-            EmotionLevel(1, "Happy", ":)", "Feeling cheerful and upbeat.", "", true, false),
+            EmotionLevel(1, "Happy", ":)", "Feeling cheerful and upbeat.", "", false, false),
             EmotionLevel(2, "Sad", ":(", "Feeling down or disappointed.", "", false, false),
             EmotionLevel(3, "Angry", ">:(", "Feeling upset or annoyed.", "", false, false),
             EmotionLevel(4, "Scared", ":o", "Feeling worried or afraid.", "", false, false),

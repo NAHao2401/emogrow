@@ -24,6 +24,7 @@ import com.example.emogrow.features.game.ui.GameViewModel
 import com.example.emogrow.features.home.ui.HomeScreen
 import com.example.emogrow.data.repository.AlbumManager
 import kotlinx.coroutines.launch
+import kotlin.random.Random
 
 @Composable
 fun AppNavGraph(
@@ -109,7 +110,7 @@ fun AppNavGraph(
                     // TODO
                 },
                 onNavigateToGame = {
-                    navController.navigate(Screen.Album.route)
+                    navController.navigate(Screen.Album.createRoute(childId))
                 },
                 onNavigateToJournal = {
                     // TODO
@@ -120,10 +121,19 @@ fun AppNavGraph(
             )
         }
 
-        composable(Screen.Album.route) {
+        composable(
+            route = Screen.Album.route,
+            arguments = listOf(navArgument("childId") { type = NavType.IntType })
+        ) { backStackEntry ->
+            val childId = backStackEntry.arguments?.getInt("childId") ?: 0
             MenuGameScreen(
+                childId = childId,
                 onLevelSelected = { levelId ->
-                    navController.navigate(Screen.Game.createRoute(levelId))
+                    navController.navigate(Screen.Game.createRoute(childId, levelId))
+                },
+                onReviewClick = {
+                    val randomLevelId = Random.nextInt(from = 1, until = 16)
+                    navController.navigate(Screen.Game.createRoute(childId, randomLevelId))
                 },
                 onBack = { navController.popBackStack() }
             )
@@ -131,8 +141,12 @@ fun AppNavGraph(
 
         composable(
             route = Screen.Game.route,
-            arguments = listOf(navArgument("levelId") { type = NavType.IntType })
+            arguments = listOf(
+                navArgument("childId") { type = NavType.IntType },
+                navArgument("levelId") { type = NavType.IntType }
+            )
         ) { backStackEntry ->
+            val childId = backStackEntry.arguments?.getInt("childId") ?: 0
             val levelId = backStackEntry.arguments?.getInt("levelId") ?: 1
             val gameViewModel: GameViewModel = viewModel()
             GameScreen(
@@ -143,12 +157,12 @@ fun AppNavGraph(
                 },
                 onLevelCompleted = { completedLevelId ->
                     scope.launch {
-                        albumManager.completeLevel(completedLevelId)
-                        navController.popBackStack(Screen.Album.route, false)
+                        albumManager.completeLevel(childId, completedLevelId)
+                        navController.popBackStack()
                     }
                 },
                 onExit = {
-                    navController.popBackStack(Screen.Album.route, false)
+                    navController.popBackStack()
                 }
             )
         }

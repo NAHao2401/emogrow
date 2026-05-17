@@ -13,10 +13,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -35,12 +37,16 @@ import com.example.emogrow.data.repository.EmotionLevel
 
 @Composable
 fun AlbumScreen(
+    childId: Int,
     onLevelSelected: (Int) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val albumManager = remember { AlbumManager.getInstance(context) }
+    LaunchedEffect(childId) {
+        albumManager.loadLevelsForChild(childId)
+    }
     val levels by albumManager.getAllLevels().collectAsState()
 
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -53,11 +59,22 @@ fun AlbumScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(levels, key = { it.id }) { level ->
-                    LevelCard(
-                        level = level,
-                        onClick = { onLevelSelected(level.id) }
-                    )
+                if (levels.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator()
+                        }
+                    }
+                } else {
+                    items(levels, key = { it.id }) { level ->
+                        LevelCard(
+                            level = level,
+                            onClick = { onLevelSelected(level.id) }
+                        )
+                    }
                 }
             }
         }

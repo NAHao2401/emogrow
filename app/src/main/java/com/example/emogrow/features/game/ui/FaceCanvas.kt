@@ -12,10 +12,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.GenericShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -73,6 +75,7 @@ fun FaceCanvas(
     placedParts: Map<ZoneId, FacePart?>,
     draggedPart: FacePart?,
     dragPosition: Offset,
+    wrongZones: Set<ZoneId>,
     requiredZones: Set<ZoneId>,
     onZonePositioned: (ZoneId, Offset) -> Unit,
     onPlacedPartTap: (ZoneId) -> Unit
@@ -98,6 +101,7 @@ fun FaceCanvas(
                 placedPart = placedParts[zoneId],
                 draggedPart = draggedPart,
                 dragPosition = dragPosition,
+                wrongZones = wrongZones,
                 accepts = spec.accepts,
                 onZonePositioned = onZonePositioned,
                 onPlacedPartTap = onPlacedPartTap
@@ -113,6 +117,7 @@ private fun BoxScope.FaceDropZone(
     placedPart: FacePart?,
     draggedPart: FacePart?,
     dragPosition: Offset,
+    wrongZones: Set<ZoneId>,
     accepts: PartType,
     onZonePositioned: (ZoneId, Offset) -> Unit,
     onPlacedPartTap: (ZoneId) -> Unit
@@ -130,6 +135,22 @@ private fun BoxScope.FaceDropZone(
     )
 
     var isNearByDrag by remember(zoneId) { mutableStateOf(false) }
+    val isWrong = zoneId in wrongZones
+    val wrongAlpha = if (isWrong) {
+        // Khi ghép sai, nhấp nháy viền đỏ để bé nhận ra zone cần sửa.
+        val transition = rememberInfiniteTransition(label = "wrongZonePulse")
+        transition.animateFloat(
+            initialValue = 0.65f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(300),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "wrongZoneAlpha"
+        ).value
+    } else {
+        0f
+    }
 
     Box(
         modifier = modifier
@@ -199,6 +220,23 @@ private fun BoxScope.FaceDropZone(
                     },
                 isMirrored = zoneId == ZoneId.RIGHT_EYE || zoneId == ZoneId.RIGHT_EYEBROW
             )
+
+            if (isWrong) {
+                // Đè lớp đỏ lên zone sai để báo vị trí cần sửa.
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .border(
+                            width = 3.dp,
+                            color = Color(0xFFFF4757).copy(alpha = wrongAlpha),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        .background(
+                            color = Color(0xFFFF4757).copy(alpha = 0.15f * wrongAlpha),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                )
+            }
         }
     }
 }

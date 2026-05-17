@@ -49,6 +49,7 @@ import kotlin.math.sqrt
 fun DraggablePart(
     part: FacePart,
     isPlaced: Boolean,
+    isReturning: Boolean,
     onDragStart: (FacePart, Offset) -> Unit,
     onDragMove: (Offset) -> Unit,
     onDragEnd: () -> Unit,
@@ -57,6 +58,7 @@ fun DraggablePart(
     var cardTopLeft by remember { mutableStateOf(Offset.Zero) }
     var dragging by remember { mutableStateOf(false) }
     val rotation = remember { Animatable(0f) }
+    val returnScale = remember { Animatable(1f) }
     var isPressed by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
         targetValue = if (isPressed) 1.08f else 1f,
@@ -73,8 +75,25 @@ fun DraggablePart(
         rotation.animateTo(0f, animationSpec = tween(110))
     }
 
+    LaunchedEffect(isReturning) {
+        if (isReturning) {
+            // Khi part vừa được trả về tray, nén nhỏ rồi bật nảy lại để tạo cảm giác hồi phục.
+            returnScale.snapTo(0.3f)
+            returnScale.animateTo(
+                targetValue = 1f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMedium
+                )
+            )
+        } else {
+            returnScale.snapTo(1f)
+        }
+    }
+
     val cardTint = GameDesign.partCardTint(part.emotion)
     val borderColor = GameDesign.partCardBorder(part.emotion)
+    val labelFontSize = if (part.type == PartType.EYEBROW) 10.sp else 11.sp
 
     Box(
         modifier = Modifier
@@ -85,8 +104,8 @@ fun DraggablePart(
             .graphicsLayer {
                 rotationZ = rotation.value
                 alpha = if (dragging || isPlaced) 0.3f else 1f
-                scaleX = scale
-                scaleY = scale
+                scaleX = scale * returnScale.value
+                scaleY = scale * returnScale.value
             }
             .pointerInput(part, isPlaced) {
                 if (isPlaced) return@pointerInput
@@ -168,7 +187,7 @@ fun DraggablePart(
                 text = part.label,
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 11.sp
+                    fontSize = labelFontSize
                 ),
                 color = GameDesign.textDark,
                 textAlign = TextAlign.Center,

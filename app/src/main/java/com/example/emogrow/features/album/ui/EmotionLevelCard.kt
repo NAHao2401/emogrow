@@ -27,7 +27,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -63,11 +62,28 @@ fun EmotionLevelCard(
     isPlayable: Boolean,
     modifier: Modifier = Modifier,
     onPlayClick: () -> Unit,
-    onReplayClick: () -> Unit
+    onReplayClick: () -> Unit,
+    compact: Boolean = false
 ) {
     val isLocked = !isPlayable && !level.isCompleted
     val colors = if (isLocked) EmotionColorPalette.lockedColors() else EmotionColorPalette.colorsFor(level.emotionName)
     val context = LocalContext.current
+    val contentPadding = if (compact) 8.dp else 16.dp
+    val imageSize = if (compact) 44.dp else 96.dp
+    val emojiSize = if (compact) 40.sp else 64.sp
+    val titleStyle = if (compact) {
+        MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp, fontWeight = FontWeight.Bold)
+    } else {
+        MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+    }
+    val spacing = if (compact) 6.dp else 10.dp
+
+    val cardClick = if (!isLocked) {
+        if (level.isCompleted) onReplayClick else onPlayClick
+    } else {
+        null
+    }
+    val cardEnabled = cardClick != null
 
     val pulseTransition = rememberInfiniteTransition(label = "pulse")
     val pulseScale by pulseTransition.animateFloat(
@@ -101,6 +117,8 @@ fun EmotionLevelCard(
     }
 
     Card(
+        onClick = { cardClick?.invoke() },
+        enabled = cardEnabled,
         shape = RoundedCornerShape(16.dp),
         border = border,
         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
@@ -113,7 +131,7 @@ fun EmotionLevelCard(
                         colors = listOf(colors.background, colors.accent.copy(alpha = 0.45f))
                     )
                 )
-                .padding(16.dp)
+                .padding(contentPadding)
         ) {
             if (!isLocked && !level.isCompleted) {
                 // Soft glow to draw attention for playable levels.
@@ -130,96 +148,82 @@ fun EmotionLevelCard(
             }
 
             Column(
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(spacing),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .alpha(if (isLocked) 0.6f else 1f)
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .size(96.dp)
-                        .shadow(8.dp, CircleShape)
-                        .background(Color.White.copy(alpha = 0.45f), CircleShape)
-                ) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(context)
-                            .data(level.imageUrl.takeIf { it.isNotBlank() })
-                            .crossfade(true)
-                            .build(),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        placeholder = ColorPainter(Color.White.copy(alpha = 0.3f)),
-                        error = ColorPainter(Color.Transparent),
-                        modifier = Modifier
-                            .matchParentSize()
-                            .clip(CircleShape)
-                    )
-                    Text(
-                        text = level.emoji.ifBlank { "😊" },
-                        style = MaterialTheme.typography.displaySmall.copy(fontSize = 64.sp),
-                        modifier = if (!level.isCompleted && !isLocked) {
-                            Modifier.alpha(1f).shadow(2.dp, CircleShape)
-                        } else {
-                            Modifier
-                        }
-                    )
-                    if (isLocked) {
-                        Surface(
-                            shape = CircleShape,
-                            color = Color.Black.copy(alpha = 0.4f),
-                            modifier = Modifier.matchParentSize()
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text(text = "🔒", style = MaterialTheme.typography.headlineMedium)
-                            }
+                if (isLocked) {
+                    Surface(
+                        shape = CircleShape,
+                        color = Color.Black.copy(alpha = 0.12f),
+                        modifier = Modifier.size(imageSize)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(text = "🔒", style = MaterialTheme.typography.headlineMedium)
                         }
                     }
-                }
 
-                Text(
-                    text = level.emotionName,
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = colors.onBackground,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                if (!isLocked) {
                     Text(
-                        text = level.description,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = colors.onBackground.copy(alpha = 0.8f),
-                        maxLines = 2,
+                        text = "Đang khóa",
+                        style = titleStyle,
+                        color = colors.onBackground,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 } else {
-                    Text(
-                        text = "🔒 Hãy hoàn thành màn trước đã",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = colors.onBackground.copy(alpha = 0.65f)
-                    )
-                }
-
-                if (level.isCompleted) {
-                    CompletedBadge(
-                        completedAt = level.completedAt,
-                        replayCount = level.replayCount,
-                        onReplayClick = onReplayClick,
-                        accent = colors.accent,
-                        onBackground = colors.onBackground
-                    )
-                } else if (!isLocked) {
-                    Button(
-                        onClick = onPlayClick,
-                        colors = ButtonDefaults.buttonColors(containerColor = colors.accent),
+                    Box(
+                        contentAlignment = Alignment.Center,
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .height(40.dp)
-                            .then(if (!level.isCompleted) Modifier else Modifier)
+                            .size(imageSize)
+                            .shadow(8.dp, CircleShape)
+                            .background(Color.White.copy(alpha = 0.45f), CircleShape)
                     ) {
-                        Text(text = "Chơi ngay", color = Color.White)
+                        AsyncImage(
+                            model = ImageRequest.Builder(context)
+                                .data(level.imageUrl.takeIf { it.isNotBlank() })
+                                .crossfade(true)
+                                .build(),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            placeholder = ColorPainter(Color.White.copy(alpha = 0.3f)),
+                            error = ColorPainter(Color.Transparent),
+                            modifier = Modifier
+                                .matchParentSize()
+                                .clip(CircleShape)
+                        )
+                        Text(
+                            text = level.emoji.ifBlank { "😊" },
+                            style = MaterialTheme.typography.displaySmall.copy(fontSize = emojiSize),
+                            modifier = Modifier.alpha(1f).shadow(2.dp, CircleShape)
+                        )
+                    }
+
+                    Text(
+                        text = level.emotionName,
+                        style = titleStyle,
+                        color = colors.onBackground,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    if (!compact) {
+                        Text(
+                            text = level.description,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = colors.onBackground.copy(alpha = 0.8f),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    if (level.isCompleted) {
+                        CompletedBadge(
+                            completedAt = level.completedAt,
+                            replayCount = level.replayCount,
+                            compact = compact,
+                            accent = colors.accent,
+                            onBackground = colors.onBackground
+                        )
                     }
                 }
             }
@@ -248,7 +252,7 @@ fun EmotionLevelCard(
 private fun CompletedBadge(
     completedAt: Long?,
     replayCount: Int,
-    onReplayClick: () -> Unit,
+    compact: Boolean,
     accent: Color,
     onBackground: Color
 ) {
@@ -271,22 +275,24 @@ private fun CompletedBadge(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(text = "🏆", style = MaterialTheme.typography.bodyMedium)
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                text = completedText ?: "🎊 Hoàn thành!",
-                style = MaterialTheme.typography.labelMedium,
-                color = onBackground
-            )
+        if (!compact) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(text = "🏆", style = MaterialTheme.typography.bodyMedium)
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = completedText ?: "🎊 Hoàn thành!",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = onBackground
+                )
+            }
         }
 
-        TextButton(onClick = onReplayClick) {
-            Text(text = "🔁 x$replayCount", color = accent)
-        }
 
-        AnimatedVisibility(visible = showConfetti) {
-            ConfettiSparkle(accent = accent)
+
+        if (!compact) {
+            AnimatedVisibility(visible = showConfetti) {
+                ConfettiSparkle(accent = accent)
+            }
         }
     }
 }

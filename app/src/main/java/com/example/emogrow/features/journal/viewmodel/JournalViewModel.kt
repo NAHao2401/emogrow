@@ -25,6 +25,7 @@ data class JournalUiState(
     val selectedEmotion: EmotionResponse? = null,
     val isWatered: Boolean = false,
     val isRecording: Boolean = false,
+    val recordedAudioPath: String? = null,
     val pastJournals: List<DiaryResponse> = emptyList(),
     val selectedDateMillis: Long = System.currentTimeMillis(),
     val availableEmotions: List<EmotionResponse> = emptyList(),
@@ -83,8 +84,12 @@ class JournalViewModel(
         }
     }
 
-    fun toggleRecording() {
-        _uiState.update { it.copy(isRecording = !it.isRecording) }
+    fun setRecordingState(isRecording: Boolean) {
+        _uiState.update { it.copy(isRecording = isRecording) }
+    }
+
+    fun setRecordedAudioPath(path: String?) {
+        _uiState.update { it.copy(recordedAudioPath = path) }
     }
 
     fun finishAndReset(childId: Int) {
@@ -101,7 +106,8 @@ class JournalViewModel(
                     emotionId = currentEmotion.emotion_id,
                     diaryDate = diaryDate,
                     plantState = "flower",
-                    seedColor = currentEmotion.color_code
+                    seedColor = currentEmotion.color_code,
+                    voiceUrl = _uiState.value.recordedAudioPath
                 )
                 
                 // Reload history
@@ -112,6 +118,7 @@ class JournalViewModel(
                         selectedEmotion = null,
                         isWatered = false,
                         isRecording = false,
+                        recordedAudioPath = null,
                         pastJournals = diaries,
                         isLoading = false
                     )

@@ -1,5 +1,9 @@
 package com.example.emogrow.features.journal.ui
 
+import android.Manifest
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
@@ -29,6 +33,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -40,6 +45,8 @@ import com.example.emogrow.data.remote.dto.journal.DiaryResponse
 import com.example.emogrow.data.remote.dto.journal.EmotionResponse
 import com.example.emogrow.features.journal.viewmodel.JournalPhase
 import com.example.emogrow.features.journal.viewmodel.JournalViewModel
+import com.example.emogrow.utils.AudioPlayerManager
+import com.example.emogrow.utils.AudioRecorderManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -49,6 +56,32 @@ import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.random.Random
+
+fun formatDateTime(dateString: String?): String {
+    if (dateString == null) return ""
+    return try {
+        var date: Date? = null
+        val formats = arrayOf(
+            "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+            "yyyy-MM-dd'T'HH:mm:ss",
+            "yyyy-MM-dd HH:mm:ss"
+        )
+        for (format in formats) {
+            try {
+                date = SimpleDateFormat(format, Locale.getDefault()).parse(dateString)
+                if (date != null) break
+            } catch (e: Exception) { }
+        }
+        
+        if (date != null) {
+            SimpleDateFormat("HH:mm:ss - dd/MM/yyyy", Locale.getDefault()).format(date)
+        } else {
+            dateString
+        }
+    } catch (e: Exception) {
+        dateString
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,6 +97,31 @@ fun JournalScreen(
     
     var selectedDiary by remember { mutableStateOf<DiaryResponse?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
+
+    val context = LocalContext.current
+    val audioRecorder = remember { AudioRecorderManager(context) }
+    val audioPlayer = remember { AudioPlayerManager() }
+    var isPlaying by remember { mutableStateOf(false) }
+
+    val recordPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (isGranted) {
+            audioRecorder.startRecording()?.let { file ->
+                viewModel.setRecordedAudioPath(file.absolutePath)
+                viewModel.setRecordingState(true)
+            }
+        } else {
+            Toast.makeText(context, "Cần cấp quyền ghi âm để sử dụng chức năng này", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            audioPlayer.stopAudio()
+            audioRecorder.stopRecording()
+        }
+    }
 
     val datePickerState = rememberDatePickerState(
         initialSelectedDateMillis = uiState.selectedDateMillis
@@ -108,24 +166,86 @@ fun JournalScreen(
 
     if (selectedDiary != null) {
         AlertDialog(
-            onDismissRequest = { selectedDiary = null },
+            onDismissRequest = { 
+                audioPlayer.stopAudio()
+                isPlaying = false
+                selectedDiary = null 
+            },
             title = { Text("Chi tiết cảm xúc") },
             text = {
                 Column {
                     Text("Cảm xúc: ${selectedDiary?.emotion_emoji ?: "❓"} ${selectedDiary?.emotion_name ?: "Không xác định"}", fontSize = 18.sp, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("Ngày: ${selectedDiary?.diary_date ?: selectedDiary?.created_at}")
+                    Text("Thời gian: ${formatDateTime(selectedDiary?.created_at ?: selectedDiary?.diary_date)}")
                     if (!selectedDiary?.feeling_note.isNullOrEmpty()) {
                         Spacer(modifier = Modifier.height(8.dp))
                         Text("Ghi chú: ${selectedDiary?.feeling_note}")
                     }
+                    if (!selectedDiary?.voice_url.isNullOrEmpty()) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(
+                            onClick = {
+                                if (isPlaying) {
+                                    audioPlayer.stopAudio()
+                                    isPlaying = false
+                                } else {
+                                    isPlaying = true
+                                    audioPlayer.playAudio(selectedDiary!!.voice_url!!) {
+                                        isPlaying = false
+                                    }
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = if (isPlaying) Color.Gray else MaterialTheme.colorScheme.primary)
+                        ) {
+                            Text(if (isPlaying) "⏸ Đang phát..." else "▶️ Nghe lại câu chuyện", color = Color.White)
+                        }
+                    }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { selectedDiary = null }) {
+                TextButton(onClick = { 
+                    audioPlayer.stopAudio()
+                    isPlaying = false
+                    selectedDiary = null 
+                }) {
                     Text("Đóng")
                 }
             }
+        )
+    }
+
+    if (uiState.isRecording) {
+        AlertDialog(
+            onDismissRequest = { },
+            title = { Text("Đang ghi âm nhật ký...", color = Color.Red, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth()) },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(120.dp)
+                            .background(Color.Red.copy(alpha = 0.1f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("🎤", fontSize = 60.sp)
+                    }
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Button(
+                        onClick = { 
+                            audioRecorder.stopRecording()
+                            viewModel.setRecordingState(false)
+                            viewModel.finishAndReset(childId) 
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                        modifier = Modifier.fillMaxWidth(0.8f)
+                    ) {
+                        Text("Kết thúc & Lưu", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            },
+            confirmButton = {}
         )
     }
 
@@ -213,7 +333,7 @@ fun JournalScreen(
                         ) {
                             MascotMessage(
                                 message = when (uiState.phase) {
-                                    JournalPhase.PLANTING -> "Kéo hạt mầm xuống chậu để gieo cảm xúc nhé!"
+                                    JournalPhase.PLANTING -> "Kéo cảm xúc vào chậu để gieo mầm nhé!"
                                     JournalPhase.SPROUTED -> "Mình cùng 'tưới nước yêu thương' nhé!"
                                     JournalPhase.HEALTHY -> if (uiState.isRecording)
                                         "Mình đang nghe nè..."
@@ -241,7 +361,7 @@ fun JournalScreen(
                                             // Hiệu ứng nước rơi
                                             if (showWaterDrops) {
                                                 Box(
-                                                    modifier = Modifier.requiredSize(180.dp), // Fix clipping by ensuring it's not 0 size
+                                                    modifier = Modifier.requiredSize(180.dp).offset(y = (-60).dp), // Fix clipping by ensuring it's not 0 size
                                                     contentAlignment = Alignment.TopCenter
                                                 ) {
                                                     WaterDropsAnimation(onAnimationEnd = {
@@ -253,9 +373,6 @@ fun JournalScreen(
                                         }
                                     }
                                     JournalPhase.HEALTHY -> {
-                                        if (uiState.isRecording) {
-                                            RecordingStatus()
-                                        }
                                         HealthyFlower(
                                             emotion = uiState.selectedEmotion?.emoji ?: "😊",
                                             onPositioned = { potPosition = it },
@@ -279,18 +396,12 @@ fun JournalScreen(
                             }
 
                             if (uiState.phase == JournalPhase.HEALTHY) {
-                                JournalRecordButton(
-                                    isRecording = uiState.isRecording,
-                                    onClick = { viewModel.toggleRecording() }
-                                )
-
-                                if (uiState.isRecording) {
-                                    Button(
-                                        onClick = { viewModel.finishAndReset(childId) },
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
-                                    ) {
-                                        Text("Kết thúc", color = Color.White, fontSize = 11.sp)
-                                    }
+                                if (!uiState.isRecording) {
+                                    JournalRecordButton(
+                                        onClick = { 
+                                            recordPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                        }
+                                    )
                                 }
                             }
                         }
@@ -369,6 +480,7 @@ fun SproutedPlant(onPositioned: (Offset) -> Unit) {
         contentDescription = "Sprout",
         modifier = Modifier
             .size(180.dp)
+            .offset(y = 30.dp)
             .onGloballyPositioned { onPositioned(it.positionInRoot()) }
     )
 }
@@ -379,7 +491,8 @@ fun HealthyFlower(emotion: String, onPositioned: (Offset) -> Unit, showFireworks
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
-                .size(250.dp)
+                .size(280.dp)
+                .offset(x = (-1).dp, y = (-14).dp)
                 .onGloballyPositioned { onPositioned(it.positionInRoot()) }
         ) {
             Image(
@@ -389,8 +502,8 @@ fun HealthyFlower(emotion: String, onPositioned: (Offset) -> Unit, showFireworks
             )
             Text(
                 text = emotion,
-                fontSize = 40.sp,
-                modifier = Modifier.offset(y = (-74).dp)
+                fontSize = 42.sp,
+                modifier = Modifier.offset(x = (-3).dp, y = (-80).dp)
             )
         }
 
@@ -420,20 +533,20 @@ fun RecordingStatus() {
 }
 
 @Composable
-fun JournalRecordButton(isRecording: Boolean, onClick: () -> Unit) {
+fun JournalRecordButton(onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .size(80.dp)
-            .background(if (isRecording) Color.Red.copy(alpha = 0.4f) else Color.White.copy(alpha = 0.2f), CircleShape)
+            .background(Color.White.copy(alpha = 0.2f), CircleShape)
             .clickable { onClick() },
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text("🎤", fontSize = 36.sp)
             Text(
-                if (isRecording) "Đang ghi" else "Ghi âm",
+                "Ghi âm",
                 fontSize = 10.sp,
-                color = if (isRecording) Color.Red else Color.White,
+                color = Color.White,
                 fontWeight = FontWeight.Bold
             )
         }
@@ -496,12 +609,14 @@ fun DraggableWateringCan(onDrop: () -> Unit) {
         DraggableItem(
             emoji = "",
             isFromSide = true,
-            onDrop = onDrop
+            onDrop = onDrop,
+            size = 80,
+            hideOnDrag = true
         ) {
             Image(
                 painter = painterResource(id = R.drawable.watering_can),
                 contentDescription = "Water Can",
-                modifier = Modifier.requiredSize(60.dp)
+                modifier = Modifier.requiredSize(78.dp)
             )
         }
         Text("Tưới nước", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
@@ -585,6 +700,8 @@ fun DraggableItem(
     emoji: String,
     isFromSide: Boolean,
     onDrop: () -> Unit,
+    size: Int = 45,
+    hideOnDrag: Boolean = false,
     content: @Composable (() -> Unit)? = null
 ) {
     var offset by remember { mutableStateOf(Offset.Zero) }
@@ -592,11 +709,16 @@ fun DraggableItem(
 
     val itemContent = @Composable {
         Box(
-            modifier = Modifier
-                .size(45.dp)
-                .background(if (isDragging) Color.LightGray.copy(alpha = 0.5f) else Color.Transparent, CircleShape),
+            modifier = Modifier.size(size.dp),
             contentAlignment = Alignment.Center
         ) {
+            if (isDragging && !hideOnDrag) {
+                Box(
+                    modifier = Modifier
+                        .size((size - 10).dp)
+                        .background(Color.LightGray.copy(alpha = 0.5f), CircleShape)
+                )
+            }
             if (content != null) {
                 content()
             } else {
@@ -630,7 +752,13 @@ fun DraggableItem(
                 )
             }
     ) {
-        itemContent()
+        if (isDragging && hideOnDrag) {
+            Box(modifier = Modifier.alpha(0f)) {
+                itemContent()
+            }
+        } else {
+            itemContent()
+        }
         
         if (isDragging) {
             Popup(

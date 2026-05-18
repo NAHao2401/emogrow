@@ -16,8 +16,8 @@ fun HomeScreen(
     onNavigateToLesson: () -> Unit,
     onNavigateToGame: () -> Unit,
     onNavigateToJournal: () -> Unit,
-    onNavigateToReview: () -> Unit
-) {
+    onNavigateToReview: () -> Unit,
+){
     val uiState by viewModel.uiState.collectAsState()
 
     LaunchedEffect(childId) {

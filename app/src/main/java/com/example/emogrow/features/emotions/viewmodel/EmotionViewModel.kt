@@ -109,6 +109,26 @@ class EmotionViewModel(
         }
     }
 
+    fun loadChildProgress(childId: Int) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                errorMessage = null
+            )
+
+            try {
+                val progress = repository.getChildProgress(childId)
+
+                _uiState.value = _uiState.value.copy(
+                    progressList = progress
+                )
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    errorMessage = ApiErrorParser.parse(e)
+                )
+            }
+        }
+    }
+
     fun openFlashcard(childId: Int, flashcardId: Int) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(

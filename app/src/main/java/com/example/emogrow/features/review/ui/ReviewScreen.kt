@@ -70,7 +70,7 @@ fun ReviewScreen(
                 currentViewDate = uiState.currentViewDate,
                 onPreviousMonth = { viewModel.previousMonth() },
                 onNextMonth = { viewModel.nextMonth() },
-                onToday = { viewModel   .goToToday() }
+                onToday = { viewModel.goToToday() }
             )
 
             // C. Jar with Emotion Beads (đã sửa để chống tràn và hiển thị số hạt)
@@ -83,9 +83,9 @@ fun ReviewScreen(
                 // Vùng chứa lọ, được cắt để hạt không vượt ra ngoài
                 Box(
                     modifier = Modifier
-                        .weight(1f)            // chiếm không gian còn lại trong cột
+                        .weight(1f)
                         .fillMaxWidth()
-                        .clipToBounds(),        // cắt mọi nội dung vẽ ra ngoài
+                        .clipToBounds(),
                     contentAlignment = Alignment.Center
                 ) {
                     EmotionJarPreview(

@@ -40,4 +40,8 @@ object RetrofitInstance {
     val reviewApi: ReviewApi by lazy {
         retrofit.create(ReviewApi::class.java)
     }
+
+    val journalApi: JournalApi by lazy {
+        retrofit.create(JournalApi::class.java)
+    }
 }

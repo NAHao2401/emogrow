@@ -166,7 +166,7 @@ class ReviewSharedViewModel(
                 }
 
                 val bubbles = allEmotions.map { entry ->
-                    val stat = stats.distribution.find { it.emotion_type == entry.emotionId }
+                    val stat = stats.distribution.find { it.emotion_type.toString() == entry.emotionId }
                     val percentage = if (stats.total_count > 0) {
                         "${(stat?.count ?: 0) * 100 / stats.total_count}%"
                     } else "0%"

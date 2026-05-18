@@ -3,6 +3,8 @@ package com.example.emogrow.data.remote.api
 import com.example.emogrow.data.remote.dto.child.ChildCreateRequest
 import com.example.emogrow.data.remote.dto.child.ChildResponse
 import com.example.emogrow.data.remote.dto.child.ChildUpdateRequest
+import com.example.emogrow.data.remote.dto.progress.GameProgressResponse
+import com.example.emogrow.data.remote.dto.progress.UpdateGameProgressRequest
 import retrofit2.http.*
 
 interface ChildApi {
@@ -23,6 +25,19 @@ interface ChildApi {
         @Header("Authorization") token: String,
         @Path("childId") childId: Int
     ): ChildResponse
+
+    @GET("children/{childId}/game-progress")
+    suspend fun getGameProgress(
+        @Header("Authorization") token: String,
+        @Path("childId") childId: Int
+    ): GameProgressResponse
+
+    @POST("children/{childId}/game-progress/complete")
+    suspend fun completeGameProgress(
+        @Header("Authorization") token: String,
+        @Path("childId") childId: Int,
+        @Body request: UpdateGameProgressRequest
+    ): GameProgressResponse
 
     @PUT("children/{childId}")
     suspend fun updateChild(

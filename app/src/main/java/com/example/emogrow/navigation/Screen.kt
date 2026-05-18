@@ -7,6 +7,12 @@ sealed class Screen(val route: String) {
 
     object CreateChild : Screen("create_child")
     object ChildList : Screen("child_list")
+    object Album : Screen("album/{childId}") {
+        fun createRoute(childId: Int) = "album/$childId"
+    }
+    object Game : Screen("game/{childId}/{levelId}") {
+        fun createRoute(childId: Int, levelId: Int) = "game/$childId/$levelId"
+    }
 
     object Home : Screen("home/{childId}") {
         fun createRoute(childId: Int) = "home/$childId"
@@ -14,10 +20,6 @@ sealed class Screen(val route: String) {
 
     object Lesson : Screen("lesson/{childId}") {
         fun createRoute(childId: Int) = "lesson/$childId"
-    }
-
-    object Game : Screen("game/{childId}") {
-        fun createRoute(childId: Int) = "game/$childId"
     }
 
     object Journal : Screen("journal/{childId}") {

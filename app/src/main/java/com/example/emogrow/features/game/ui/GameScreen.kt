@@ -1,40 +1,534 @@
 package com.example.emogrow.features.game.ui
 
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.Canvas
 import androidx.compose.material3.Text
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.systemBarsPadding
+import kotlinx.coroutines.delay
+import kotlin.math.roundToInt
+import kotlin.random.Random
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.activity.compose.BackHandler
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 
 @Composable
 fun GameScreen(
-    childId: Int
+    viewModel: GameViewModel,
+    levelId: Int,
+    onFaceCompleted: (EmotionType, Boolean) -> Unit,
+    onLevelCompleted: (Int) -> Unit,
+    onExit: () -> Unit
 ) {
-    Column(
+    val uiState by viewModel.uiState.collectAsState()
+    val replayCount by viewModel.replayCount.collectAsState()
+    val haptic = LocalHapticFeedback.current
+
+    var faceCanvasPosition by remember { mutableStateOf(Offset.Zero) }
+    var faceCanvasSize by remember { mutableStateOf(Size.Zero) }
+    var showExitDialog by remember { mutableStateOf(false) }
+    var pendingReturnPartKeys by remember { mutableStateOf(emptySet<String>()) }
+    var returnAnimationPartKeys by remember { mutableStateOf(emptySet<String>()) }
+
+    val placedPartKeys = remember(uiState.placedParts) {
+        uiState.placedParts.values
+            .filterNotNull()
+            .map { it.uniqueKey }
+            .toSet()
+    }
+
+    var confettiKey by remember { mutableStateOf(0) }
+    var showConfetti by remember { mutableStateOf(false) }
+
+    LaunchedEffect(levelId) {
+        viewModel.setLevel(levelId)
+    }
+
+    LaunchedEffect(uiState.currentRound) {
+        showConfetti = false
+    }
+
+    LaunchedEffect(uiState.wrongZones) {
+        if (uiState.wrongZones.isNotEmpty()) {
+            // Ghi nhận các bộ phận vừa ghép sai để trả animation về khay sau khi delay kết thúc.
+            pendingReturnPartKeys = uiState.wrongZones.mapNotNull { zoneId ->
+                uiState.placedParts[zoneId]?.uniqueKey
+            }.toSet()
+
+            // Rung nhẹ 2 lần để báo cho bé biết đang ghép sai.
+            if (pendingReturnPartKeys.isNotEmpty()) {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                delay(150)
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            }
+        } else if (pendingReturnPartKeys.isNotEmpty()) {
+            // Khi wrongZones được xóa, kích hoạt hiệu ứng bật lại trong khay cho các part vừa bị trả về.
+            returnAnimationPartKeys = pendingReturnPartKeys
+            pendingReturnPartKeys = emptySet()
+        }
+    }
+
+    LaunchedEffect(returnAnimationPartKeys) {
+        if (returnAnimationPartKeys.isNotEmpty()) {
+            delay(420)
+            returnAnimationPartKeys = emptySet()
+        }
+    }
+
+
+
+    LaunchedEffect(uiState.isCompleted) {
+        if (uiState.isCompleted) {
+            confettiKey += 1
+            showConfetti = true
+            onFaceCompleted(uiState.currentRound.emotion, uiState.currentRound.isReview)
+        }
+    }
+
+    if (showExitDialog) {
+        BackHandler { showExitDialog = false }
+    } else {
+        BackHandler {
+            showExitDialog = true
+        }
+    }
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+            .background(GameDesign.screenBg)
+            .systemBarsPadding()
     ) {
-        Text(
-            text = "🎮",
-            style = MaterialTheme.typography.displayLarge
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = GameDesign.screenPadH, vertical = 12.dp)
+        ) {
+            PromptHeader(
+                round = uiState.currentRound,
+                onBackClick = { showExitDialog = true },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 136.dp)
+            )
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(0.47f),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier.onGloballyPositioned { coordinates ->
+                        faceCanvasPosition = coordinates.positionInRoot()
+                        faceCanvasSize = Size(
+                            width = coordinates.size.width.toFloat(),
+                            height = coordinates.size.height.toFloat()
+                        )
+                    },
+                    contentAlignment = Alignment.Center
+                ) {
+                    FaceCanvas(
+                        placedParts = uiState.placedParts,
+                        draggedPart = uiState.draggedPart,
+                        dragPosition = uiState.dragPosition,
+                        wrongZones = uiState.wrongZones,
+                        requiredZones = uiState.currentRound.targetFace.keys,
+                        onZonePositioned = { zoneId, center ->
+                            viewModel.updateZoneCenter(zoneId, center)
+                        },
+                        onPlacedPartTap = { zoneId ->
+                            viewModel.removePart(zoneId)
+                        }
+                    )
+                }
+            }
+
+            PartsTray(
+                availableParts = uiState.currentRound.availableParts,
+                placedPartIds = placedPartKeys,
+                isDragging = uiState.draggedPart != null,
+                returningPartKeys = returnAnimationPartKeys,
+                onDragStart = { part, position ->
+                    viewModel.startDrag(part)
+                    viewModel.updateDragPosition(position)
+                },
+                onDragMove = { position ->
+                    viewModel.updateDragPosition(position)
+                },
+                onDragEnd = {
+                    viewModel.tryDropPart(
+                        dropPosition = uiState.dragPosition,
+                        faceCanvasPosition = faceCanvasPosition,
+                        faceSize = faceCanvasSize
+                    )
+                },
+                onDragCancel = {
+                    viewModel.cancelDrag()
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(0.38f)
+            )
+        }
+
+        DragOverlay(
+            draggedPart = uiState.draggedPart,
+            dragPosition = uiState.dragPosition
         )
 
-        Text(
-            text = "Trò chơi cảm xúc",
-            style = MaterialTheme.typography.headlineMedium
-        )
+        if (showConfetti) {
+            ConfettiEffect(
+                key = confettiKey,
+                onFinished = {
+                    showConfetti = false
+                    onLevelCompleted(levelId)
+                }
+            )
+        }
 
-        Text(
-            text = "Tính năng trò chơi sẽ được phát triển ở bước tiếp theo.",
-            style = MaterialTheme.typography.bodyMedium
+        if (showExitDialog) {
+            ConfirmExitDialog(
+                onConfirmExit = {
+                    showExitDialog = false
+                    onExit()
+                },
+                onDismiss = { showExitDialog = false }
+            )
+        }
+    }
+}
+
+private fun stickerResNameForEmotion(emotion: EmotionType): String = when (emotion) {
+    EmotionType.HAPPY -> "part_mouth_happy"
+    EmotionType.SAD -> "part_mouth_sad"
+    EmotionType.ANGRY -> "part_mouth_angry"
+    EmotionType.SURPRISED -> "part_eye_happy_left"
+    EmotionType.SCARED -> "part_eye_sad_left"
+    EmotionType.WORRIED -> "part_eye_worried_left"
+    EmotionType.SHY -> "part_eye_shy_left"
+    EmotionType.PROUD -> "part_eye_proud"
+    EmotionType.LOVE -> "part_love_left_eye"
+    EmotionType.CALM -> "part_calm_left_eye"
+    EmotionType.TIRED -> "part_tired_left_eye"
+    EmotionType.LONELY -> "part_lonely_left_eye"
+    EmotionType.CONFUSED -> "part_confused_eye"
+    EmotionType.JEALOUS -> "part_jealous_left_eye"
+    EmotionType.EXCITED -> "part_excited_left_eye"
+}
+
+
+@Composable
+private fun ConfettiEffect(
+    key: Int,
+    onFinished: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val durationMs = remember(key) { Random.nextInt(1000, 1501) }
+    val progress = remember(key) { Animatable(0f) }
+    var canvasSize by remember { mutableStateOf(IntSize.Zero) }
+
+    val density = LocalDensity.current
+    val colors = remember {
+        listOf(
+            Color.Red,
+            Color.Blue,
+            Color.Yellow,
+            Color.Green,
+            Color(0xFF9B59B6)
         )
     }
+
+    val particles = remember(key, canvasSize) {
+        if (canvasSize.width == 0 || canvasSize.height == 0) {
+            emptyList()
+        } else {
+            val widthPx = canvasSize.width.toFloat()
+            val heightPx = canvasSize.height.toFloat()
+            List(140) {
+                val sizeDp = Random.nextInt(4, 13).dp
+                val sizePx = with(density) { sizeDp.toPx() }
+                val startX = Random.nextFloat() * widthPx
+                val startY = -Random.nextFloat() * heightPx * 0.2f
+                val endY = heightPx + Random.nextFloat() * heightPx * 0.2f
+                val driftX = (Random.nextFloat() - 0.5f) * widthPx * 0.35f
+                val rotation = Random.nextFloat() * 360f
+                ConfettiParticle(
+                    color = colors[Random.nextInt(colors.size)],
+                    sizePx = sizePx,
+                    startX = startX,
+                    startY = startY,
+                    endY = endY,
+                    driftX = driftX,
+                    rotation = rotation
+                )
+            }
+        }
+    }
+
+    LaunchedEffect(key) {
+        progress.snapTo(0f)
+        progress.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(durationMillis = durationMs, easing = LinearEasing)
+        )
+        onFinished()
+    }
+
+    Canvas(
+        modifier = modifier
+            .fillMaxSize()
+            .onSizeChanged { canvasSize = it }
+    ) {
+        val t = progress.value
+        particles.forEach { particle ->
+            val x = particle.startX + particle.driftX * t
+            val y = particle.startY + (particle.endY - particle.startY) * t
+            withTransform({
+                translate(left = x, top = y)
+                rotate(degrees = particle.rotation + 90f * t)
+            }) {
+                drawRect(
+                    color = particle.color,
+                    topLeft = Offset(-particle.sizePx / 2f, -particle.sizePx / 2f),
+                    size = Size(particle.sizePx, particle.sizePx)
+                )
+            }
+        }
+    }
+}
+
+private data class ConfettiParticle(
+    val color: Color,
+    val sizePx: Float,
+    val startX: Float,
+    val startY: Float,
+    val endY: Float,
+    val driftX: Float,
+    val rotation: Float
+)
+
+
+@Composable
+private fun PromptHeader(
+    round: GameRound,
+    onBackClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val gradient = GameDesign.emotionGradient(round.emotion)
+    val darkerShade = gradient.last().copy(
+        red = (gradient.last().red * 0.7f).coerceIn(0f, 1f),
+        green = (gradient.last().green * 0.7f).coerceIn(0f, 1f),
+        blue = (gradient.last().blue * 0.7f).coerceIn(0f, 1f)
+    )
+
+    Box(
+        modifier = modifier.padding(horizontal = 0.dp, vertical = 12.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(108.dp)
+                .offset(y = 5.dp)
+                .shadow(elevation = 0.dp, shape = RoundedCornerShape(28.dp))
+                .background(
+                    brush = Brush.verticalGradient(listOf(darkerShade, darkerShade)),
+                    shape = RoundedCornerShape(28.dp)
+                )
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(108.dp)
+                .shadow(elevation = 10.dp, shape = RoundedCornerShape(28.dp))
+                .background(
+                    brush = Brush.linearGradient(gradient),
+                    shape = RoundedCornerShape(28.dp)
+                )
+                .padding(horizontal = 12.dp, vertical = 14.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = round.promptText,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    style = TextStyle(
+                        shadow = Shadow(
+                            color = Color(0x40000000),
+                            offset = Offset(0f, 2f),
+                            blurRadius = 4f
+                        ),
+                        lineHeight = 26.sp
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                // Tách emoji ra riêng để không bị cắt ở đáy khi promptText dài.
+                Text(
+                    text = round.promptEmoji,
+                    fontSize = 30.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 2.dp, bottom = 4.dp)
+                )
+            }
+
+            IconButton(
+                onClick = onBackClick,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    // offset âm để icon sát mép trái của box
+                    .offset(x = (-12).dp, y = 0.dp)
+                    .size(36.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Quay lại",
+                    tint = Color.White
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DragOverlay(
+    draggedPart: FacePart?,
+    dragPosition: Offset
+) {
+    if (draggedPart == null) return
+
+    val density = LocalDensity.current
+    val partWidthPx = with(density) { 88.dp.toPx() }
+    val partHeightPx = with(density) { 96.dp.toPx() }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .size(width = 88.dp, height = 96.dp)
+                .offset {
+                    IntOffset(
+                        x = (dragPosition.x - partWidthPx / 2f).roundToInt(),
+                        y = (dragPosition.y - partHeightPx / 2f).roundToInt()
+                    )
+                }
+                .graphicsLayer {
+                    scaleX = 1.1f
+                    scaleY = 1.1f
+                    alpha = 0.95f
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            FacePartDrawing(
+                part = draggedPart,
+                modifier = Modifier.size(
+                    width = 64.dp,
+                    height = if (draggedPart.type == PartType.EYE) 56.dp else 64.dp
+                )
+            )
+        }
+    }
+}
+
+@Composable
+private fun ConfirmExitDialog(
+    onConfirmExit: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "Bạn có chắc chắn muốn quay lại?",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirmExit,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Check,
+                    contentDescription = null,
+                    tint = Color.White
+                )
+
+            }
+        },
+        dismissButton = {
+            Button(
+                onClick = onDismiss,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828))
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Close,
+                    contentDescription = null,
+                    tint = Color.White
+                )
+
+            }
+        }
+    )
 }

@@ -65,7 +65,7 @@ fun EmoGrowScaffold(
             title = "Game",
             emoji = "🎮",
             selectedRoutes = listOf(Screen.Game.route),
-            createRoute = { Screen.Game.createRoute(it) }
+            createRoute = { Screen.Album.createRoute(it) }
         ),
         EmoGrowNavItem(
             title = "Journal",

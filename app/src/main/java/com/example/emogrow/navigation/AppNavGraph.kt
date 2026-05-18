@@ -12,10 +12,14 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.remember
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import androidx.navigation.NavType
+import androidx.compose.runtime.rememberCoroutineScope
 import com.example.emogrow.features.auth.ui.LoginScreen
 import com.example.emogrow.features.auth.ui.RegisterScreen
 import com.example.emogrow.features.auth.viewmodel.AuthViewModel
@@ -35,6 +39,11 @@ import com.example.emogrow.features.home.ui.HomeScreen
 import com.example.emogrow.features.journal.ui.JournalScreen
 import com.example.emogrow.features.profile.ui.UserProfileScreen
 import com.example.emogrow.features.review.ui.ReviewScreen
+import com.example.emogrow.features.game.ui.MenuGameScreen
+import com.example.emogrow.features.game.ui.GameViewModel
+import com.example.emogrow.data.repository.AlbumManager
+import kotlinx.coroutines.launch
+import kotlin.random.Random
 
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
@@ -44,6 +53,8 @@ fun AppNavGraph(
     emotionFactory: EmotionViewModelFactory
 ) {
     val navController = rememberNavController()
+    val albumManager = remember { AlbumManager.getInstance(navController.context) }
+    val scope = rememberCoroutineScope()
 
     val authViewModel: AuthViewModel = viewModel(factory = authFactory)
     val childViewModel: ChildViewModel = viewModel(factory = childFactory)
@@ -166,7 +177,7 @@ fun AppNavGraph(
                             navController.navigateToMainTab(Screen.Lesson.createRoute(childId))
                         },
                         onNavigateToGame = {
-                            navController.navigateToMainTab(Screen.Game.createRoute(childId))
+                            navController.navigateToMainTab(Screen.Album.createRoute(childId))
                         },
                         onNavigateToJournal = {
                             navController.navigateToMainTab(Screen.Journal.createRoute(childId))
@@ -291,24 +302,32 @@ fun AppNavGraph(
             }
         }
 
-        composable(Screen.Game.route) { backStackEntry ->
-            val childId = backStackEntry.arguments
-                ?.getString("childId")
-                ?.toIntOrNull() ?: return@composable
-
-            EmoGrowScaffold(
-                navController = navController,
-                childId = childId,
-                title = "Game"
-            ) { paddingValues ->
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues)
-                ) {
-                    GameScreen(childId = childId)
+        composable(
+            route = Screen.Game.route,
+            arguments = listOf(
+                navArgument("childId") { type = NavType.IntType },
+                navArgument("levelId") { type = NavType.IntType }
+            )
+        ) { backStackEntry ->
+            val childId = backStackEntry.arguments?.getInt("childId") ?: 0
+            val levelId = backStackEntry.arguments?.getInt("levelId") ?: 1
+            val gameViewModel: GameViewModel = viewModel()
+            GameScreen(
+                viewModel = gameViewModel,
+                levelId = levelId,
+                onFaceCompleted = { _, _ ->
+                    // Teammate se xu ly celebration va flow round.
+                },
+                onLevelCompleted = { completedLevelId ->
+                    scope.launch {
+                        albumManager.completeLevel(childId, completedLevelId)
+                        navController.popBackStack()
+                    }
+                },
+                onExit = {
+                    navController.popBackStack()
                 }
-            }
+            )
         }
 
         composable(Screen.Journal.route) { backStackEntry ->
@@ -424,6 +443,52 @@ fun AppNavGraph(
                     )
                 }
             }
+        }
+
+        composable(
+            route = Screen.Album.route,
+            arguments = listOf(navArgument("childId") { type = NavType.IntType })
+        ) { backStackEntry ->
+            val childId = backStackEntry.arguments?.getInt("childId") ?: 0
+            MenuGameScreen(
+                childId = childId,
+                onLevelSelected = { levelId ->
+                    navController.navigate(Screen.Game.createRoute(childId, levelId))
+                },
+                onReviewClick = {
+                    val randomLevelId = Random.nextInt(from = 1, until = 16)
+                    navController.navigate(Screen.Game.createRoute(childId, randomLevelId))
+                },
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = Screen.Game.route,
+            arguments = listOf(
+                navArgument("childId") { type = NavType.IntType },
+                navArgument("levelId") { type = NavType.IntType }
+            )
+        ) { backStackEntry ->
+            val childId = backStackEntry.arguments?.getInt("childId") ?: 0
+            val levelId = backStackEntry.arguments?.getInt("levelId") ?: 1
+            val gameViewModel: GameViewModel = viewModel()
+            GameScreen(
+                viewModel = gameViewModel,
+                levelId = levelId,
+                onFaceCompleted = { _, _ ->
+                    // Teammate se xu ly celebration va flow round.
+                },
+                onLevelCompleted = { completedLevelId ->
+                    scope.launch {
+                        albumManager.completeLevel(childId, completedLevelId)
+                        navController.popBackStack()
+                    }
+                },
+                onExit = {
+                    navController.popBackStack()
+                }
+            )
         }
     }
 }

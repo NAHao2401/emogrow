@@ -5,6 +5,8 @@ import com.example.emogrow.data.remote.api.ChildApi
 import com.example.emogrow.data.remote.dto.child.ChildCreateRequest
 import com.example.emogrow.data.remote.dto.child.ChildResponse
 import com.example.emogrow.data.remote.dto.child.ChildUpdateRequest
+import com.example.emogrow.data.remote.dto.progress.GameProgressResponse
+import com.example.emogrow.data.remote.dto.progress.UpdateGameProgressRequest
 import kotlinx.coroutines.flow.first
 
 class ChildRepository(
@@ -39,6 +41,18 @@ class ChildRepository(
 
     suspend fun getChildById(childId: Int): ChildResponse {
         return childApi.getChildById(getBearerToken(), childId)
+    }
+
+    suspend fun getGameProgress(childId: Int): GameProgressResponse {
+        return childApi.getGameProgress(getBearerToken(), childId)
+    }
+
+    suspend fun completeGameProgress(childId: Int, lastPassedLevel: Int): GameProgressResponse {
+        return childApi.completeGameProgress(
+            token = getBearerToken(),
+            childId = childId,
+            request = UpdateGameProgressRequest(last_passed_level = lastPassedLevel)
+        )
     }
 
     suspend fun updateChild(

@@ -36,4 +36,8 @@ object RetrofitInstance {
     val emotionApi: EmotionApi by lazy {
         retrofit.create(EmotionApi::class.java)
     }
+
+    val journalApi: JournalApi by lazy {
+        retrofit.create(JournalApi::class.java)
+    }
 }

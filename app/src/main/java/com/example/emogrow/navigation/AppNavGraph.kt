@@ -45,12 +45,18 @@ import com.example.emogrow.data.repository.AlbumManager
 import kotlinx.coroutines.launch
 import kotlin.random.Random
 
+import com.example.emogrow.features.journal.viewmodel.JournalViewModel
+import com.example.emogrow.features.journal.viewmodel.JournalViewModelFactory
+
+
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun AppNavGraph(
     authFactory: AuthViewModelFactory,
     childFactory: ChildViewModelFactory,
-    emotionFactory: EmotionViewModelFactory
+    emotionFactory: EmotionViewModelFactory,
+    journalFactory: JournalViewModelFactory
+
 ) {
     val navController = rememberNavController()
     val albumManager = remember { AlbumManager.getInstance(navController.context) }
@@ -59,6 +65,7 @@ fun AppNavGraph(
     val authViewModel: AuthViewModel = viewModel(factory = authFactory)
     val childViewModel: ChildViewModel = viewModel(factory = childFactory)
     val emotionViewModel: EmotionViewModel = viewModel(factory = emotionFactory)
+    val journalViewModel: JournalViewModel = viewModel(factory = journalFactory)
 
     NavHost(
         navController = navController,
@@ -302,54 +309,6 @@ fun AppNavGraph(
             }
         }
 
-        composable(
-            route = Screen.Game.route,
-            arguments = listOf(
-                navArgument("childId") { type = NavType.IntType },
-                navArgument("levelId") { type = NavType.IntType }
-            )
-        ) { backStackEntry ->
-            val childId = backStackEntry.arguments?.getInt("childId") ?: 0
-            val levelId = backStackEntry.arguments?.getInt("levelId") ?: 1
-            val gameViewModel: GameViewModel = viewModel()
-            GameScreen(
-                viewModel = gameViewModel,
-                levelId = levelId,
-                onFaceCompleted = { _, _ ->
-                    // Teammate se xu ly celebration va flow round.
-                },
-                onLevelCompleted = { completedLevelId ->
-                    scope.launch {
-                        albumManager.completeLevel(childId, completedLevelId)
-                        navController.popBackStack()
-                    }
-                },
-                onExit = {
-                    navController.popBackStack()
-                }
-            )
-        }
-
-        composable(Screen.Journal.route) { backStackEntry ->
-            val childId = backStackEntry.arguments
-                ?.getString("childId")
-                ?.toIntOrNull() ?: return@composable
-
-            EmoGrowScaffold(
-                navController = navController,
-                childId = childId,
-                title = "Journal"
-            ) { paddingValues ->
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues)
-                ) {
-                    JournalScreen(childId = childId)
-                }
-            }
-        }
-
         composable(Screen.Review.route) { backStackEntry ->
             val childId = backStackEntry.arguments
                 ?.getString("childId")
@@ -486,6 +445,20 @@ fun AppNavGraph(
                     }
                 },
                 onExit = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(Screen.Journal.route) { backStackEntry ->
+            val childId = backStackEntry.arguments
+                ?.getString("childId")
+                ?.toInt() ?: 0
+
+            JournalScreen(
+                childId = childId,
+                viewModel = journalViewModel,
+                onBack = {
                     navController.popBackStack()
                 }
             )

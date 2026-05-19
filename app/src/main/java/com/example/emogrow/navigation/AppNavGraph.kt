@@ -48,7 +48,6 @@ import kotlin.random.Random
 import com.example.emogrow.features.journal.viewmodel.JournalViewModel
 import com.example.emogrow.features.journal.viewmodel.JournalViewModelFactory
 
-
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun AppNavGraph(
@@ -66,6 +65,15 @@ fun AppNavGraph(
     val childViewModel: ChildViewModel = viewModel(factory = childFactory)
     val emotionViewModel: EmotionViewModel = viewModel(factory = emotionFactory)
     val journalViewModel: JournalViewModel = viewModel(factory = journalFactory)
+
+    val globalAuthState by authViewModel.uiState.collectAsState()
+
+    LaunchedEffect(globalAuthState.isLoggedOut) {
+        if (globalAuthState.isLoggedOut) {
+            authViewModel.resetState()
+            navController.logoutToLogin()
+        }
+    }
 
     NavHost(
         navController = navController,
@@ -154,7 +162,12 @@ fun AppNavGraph(
             ChildListScreen(
                 viewModel = childViewModel,
                 onSelectChild = { child ->
-                    navController.navigate(Screen.Home.createRoute(child.child_id))
+                    navController.navigate(Screen.Home.createRoute(child.child_id)) {
+                        popUpTo(Screen.ChildList.route) {
+                            inclusive = false
+                        }
+                        launchSingleTop = true
+                    }
                 },
                 onCreateChild = {
                     navController.navigate(Screen.CreateChild.route)
@@ -170,7 +183,10 @@ fun AppNavGraph(
             EmoGrowScaffold(
                 navController = navController,
                 childId = childId,
-                title = "EMOGROW"
+                title = "EMOGROW",
+                onLogout = {
+                    authViewModel.logout()
+                }
             ) { paddingValues ->
                 Box(
                     modifier = Modifier
@@ -181,16 +197,28 @@ fun AppNavGraph(
                         childId = childId,
                         viewModel = childViewModel,
                         onNavigateToLesson = {
-                            navController.navigateToMainTab(Screen.Lesson.createRoute(childId))
+                            navController.navigateToMainTab(
+                                childId = childId,
+                                route = Screen.Lesson.createRoute(childId)
+                            )
                         },
                         onNavigateToGame = {
-                            navController.navigateToMainTab(Screen.Album.createRoute(childId))
+                            navController.navigateToMainTab(
+                                childId = childId,
+                                route = Screen.Album.createRoute(childId)
+                            )
                         },
                         onNavigateToJournal = {
-                            navController.navigateToMainTab(Screen.Journal.createRoute(childId))
+                            navController.navigateToMainTab(
+                                childId = childId,
+                                route = Screen.Journal.createRoute(childId)
+                            )
                         },
                         onNavigateToReview = {
-                            navController.navigateToMainTab(Screen.Review.createRoute(childId))
+                            navController.navigateToMainTab(
+                                childId = childId,
+                                route = Screen.Review.createRoute(childId)
+                            )
                         }
                     )
                 }
@@ -205,7 +233,11 @@ fun AppNavGraph(
             EmoGrowScaffold(
                 navController = navController,
                 childId = childId,
-                title = "Lesson"
+                title = "Lesson",
+                showTopBar = false,
+                onLogout = {
+                    authViewModel.logout()
+                }
             ) { paddingValues ->
                 Box(
                     modifier = Modifier
@@ -216,9 +248,7 @@ fun AppNavGraph(
                         childId = childId,
                         viewModel = emotionViewModel,
                         onBack = {
-                            navController.navigate(Screen.Home.createRoute(childId)) {
-                                launchSingleTop = true
-                            }
+                            navController.backToHome(childId)
                         },
                         onSelectEmotion = { emotion ->
                             navController.navigate(
@@ -249,7 +279,11 @@ fun AppNavGraph(
             EmoGrowScaffold(
                 navController = navController,
                 childId = childId,
-                title = "Lesson"
+                title = "Lesson",
+                showTopBar = false,
+                onLogout = {
+                    authViewModel.logout()
+                }
             ) { paddingValues ->
                 Box(
                     modifier = Modifier
@@ -281,7 +315,11 @@ fun AppNavGraph(
             EmoGrowScaffold(
                 navController = navController,
                 childId = childId,
-                title = "Lesson"
+                title = "Lesson",
+                showTopBar = false,
+                onLogout = {
+                    authViewModel.logout()
+                }
             ) { paddingValues ->
                 Box(
                     modifier = Modifier
@@ -317,7 +355,11 @@ fun AppNavGraph(
             EmoGrowScaffold(
                 navController = navController,
                 childId = childId,
-                title = "Review"
+                title = "Review",
+                showTopBar = false,
+                onLogout = {
+                    authViewModel.logout()
+                }
             ) { paddingValues ->
                 Box(
                     modifier = Modifier
@@ -337,7 +379,10 @@ fun AppNavGraph(
             EmoGrowScaffold(
                 navController = navController,
                 childId = childId,
-                title = "Hồ sơ bé"
+                title = "Hồ sơ bé",
+                onLogout = {
+                    authViewModel.logout()
+                }
             ) { paddingValues ->
                 Box(
                     modifier = Modifier
@@ -350,9 +395,10 @@ fun AppNavGraph(
                         emotionViewModel = emotionViewModel,
                         onChangeChild = {
                             navController.navigate(Screen.ChildList.route) {
-                                popUpTo(Screen.Home.route) {
+                                popUpTo(Screen.Home.createRoute(childId)) {
                                     inclusive = true
                                 }
+                                launchSingleTop = true
                             }
                         }
                     )
@@ -365,25 +411,14 @@ fun AppNavGraph(
                 ?.getString("childId")
                 ?.toIntOrNull() ?: return@composable
 
-            val authState by authViewModel.uiState.collectAsState()
-
-            LaunchedEffect(authState.isLoggedOut) {
-                if (authState.isLoggedOut) {
-                    authViewModel.resetState()
-
-                    navController.navigate(Screen.Login.route) {
-                        popUpTo(0) {
-                            inclusive = true
-                        }
-                    }
-                }
-            }
-
             EmoGrowScaffold(
                 navController = navController,
                 childId = childId,
                 title = "Tài khoản",
-                showBottomBar = true
+                showBottomBar = true,
+                onLogout = {
+                    authViewModel.logout()
+                }
             ) { paddingValues ->
                 Box(
                     modifier = Modifier
@@ -394,11 +429,13 @@ fun AppNavGraph(
                         authViewModel = authViewModel,
                         childViewModel = childViewModel,
                         onManageChildren = {
-                            navController.navigate(Screen.ChildList.route)
+                            navController.navigate(Screen.ChildList.route) {
+                                popUpTo(Screen.Home.createRoute(childId)) {
+                                    inclusive = true
+                                }
+                                launchSingleTop = true
+                            }
                         },
-                        onLogout = {
-                            authViewModel.logout()
-                        }
                     )
                 }
             }
@@ -409,17 +446,36 @@ fun AppNavGraph(
             arguments = listOf(navArgument("childId") { type = NavType.IntType })
         ) { backStackEntry ->
             val childId = backStackEntry.arguments?.getInt("childId") ?: 0
-            MenuGameScreen(
+            EmoGrowScaffold(
+                navController = navController,
                 childId = childId,
-                onLevelSelected = { levelId ->
-                    navController.navigate(Screen.Game.createRoute(childId, levelId))
-                },
-                onReviewClick = {
-                    val randomLevelId = Random.nextInt(from = 1, until = 16)
-                    navController.navigate(Screen.Game.createRoute(childId, randomLevelId))
-                },
-                onBack = { navController.popBackStack() }
-            )
+                title = "Game",
+                showTopBar = false,
+                showBottomBar = true,
+                onLogout = {
+                    authViewModel.logout()
+                }
+            ) { paddingValues ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues)
+                ) {
+                    MenuGameScreen(
+                        childId = childId,
+                        onLevelSelected = { levelId ->
+                            navController.navigate(Screen.Game.createRoute(childId, levelId))
+                        },
+                        onReviewClick = {
+                            val randomLevelId = Random.nextInt(from = 1, until = 16)
+                            navController.navigate(Screen.Game.createRoute(childId, randomLevelId))
+                        },
+                        onBack = {
+                            navController.backToHome(childId)
+                        }
+                    )
+                }
+            }
         }
 
         composable(
@@ -455,13 +511,30 @@ fun AppNavGraph(
                 ?.getString("childId")
                 ?.toInt() ?: 0
 
-            JournalScreen(
+            EmoGrowScaffold(
+                navController = navController,
                 childId = childId,
-                viewModel = journalViewModel,
-                onBack = {
-                    navController.popBackStack()
+                title = "Journal",
+                showTopBar = false,
+                showBottomBar = true,
+                onLogout = {
+                    authViewModel.logout()
                 }
-            )
+            ) { paddingValues ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues)
+                ) {
+                    JournalScreen(
+                        childId = childId,
+                        viewModel = journalViewModel,
+                        onBack = {
+                            navController.backToHome(childId)
+                        }
+                    )
+                }
+            }
         }
     }
 }

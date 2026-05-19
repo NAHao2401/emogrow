@@ -52,12 +52,10 @@ fun UserProfileScreen(
     authViewModel: AuthViewModel,
     childViewModel: ChildViewModel,
     onManageChildren: () -> Unit,
-    onLogout: () -> Unit
 ) {
     val authState by authViewModel.uiState.collectAsState()
     val childState by childViewModel.uiState.collectAsState()
 
-    var showLogoutDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         authViewModel.loadCurrentUser()
@@ -70,46 +68,6 @@ fun UserProfileScreen(
     val fullName = user?.full_name ?: "Phụ huynh"
     val email = user?.email ?: "Đang tải email..."
     val role = user?.role ?: "parent"
-
-    if (showLogoutDialog) {
-        AlertDialog(
-            onDismissRequest = {
-                showLogoutDialog = false
-            },
-            title = {
-                Text(
-                    text = "Đăng xuất?",
-                    fontWeight = FontWeight.Bold
-                )
-            },
-            text = {
-                Text("Bạn có chắc chắn muốn đăng xuất khỏi tài khoản hiện tại không?")
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showLogoutDialog = false
-                        onLogout()
-                    }
-                ) {
-                    Text(
-                        text = "Đăng xuất",
-                        color = Color(0xFFD9534F),
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        showLogoutDialog = false
-                    }
-                ) {
-                    Text("Hủy")
-                }
-            }
-        )
-    }
 
     if (authState.isLoading && user == null) {
         Box(
@@ -188,9 +146,6 @@ fun UserProfileScreen(
         item {
             AccountActionCard(
                 onManageChildren = onManageChildren,
-                onLogoutClick = {
-                    showLogoutDialog = true
-                }
             )
         }
 
@@ -666,8 +621,7 @@ private fun InsightRow(
 
 @Composable
 private fun AccountActionCard(
-    onManageChildren: () -> Unit,
-    onLogoutClick: () -> Unit
+    onManageChildren: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -706,20 +660,6 @@ private fun AccountActionCard(
             }
 
             Spacer(modifier = Modifier.height(12.dp))
-
-            OutlinedButton(
-                onClick = onLogoutClick,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Text(
-                    text = "Đăng xuất",
-                    color = Color(0xFFD9534F),
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
         }
     }
 }

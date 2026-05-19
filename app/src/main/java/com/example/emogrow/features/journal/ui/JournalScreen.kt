@@ -9,6 +9,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
@@ -19,6 +20,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.*
@@ -28,6 +30,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -252,14 +256,51 @@ fun JournalScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Khu vườn tâm hồn") },
+                title = {
+                    Box {
+                        Text(
+                            text = "Khu vườn tâm hồn",
+                            modifier = Modifier.padding(start = 12.dp),
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                drawStyle = Stroke(
+                                    miter = 15f,
+                                    width = 6f,
+                                    join = StrokeJoin.Round
+                                )
+                            ),
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Black
+                        )
+                        Text(
+                            text = "Khu vườn tâm hồn",
+                            modifier = Modifier.padding(start = 12.dp),
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier
+                            .padding(start = 10.dp)
+                            .size(40.dp)
+                            .background(
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                                shape = CircleShape
+                            )
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Quay lại",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.White.copy(alpha = 0.8f)
+                    containerColor = Color.Transparent,
+                    scrolledContainerColor = Color.Transparent
                 )
             )
         }
@@ -267,7 +308,6 @@ fun JournalScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
         ) {
             // Hình nền khu vườn
             Image(
@@ -280,6 +320,7 @@ fun JournalScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
+                    .padding(padding)
                     .padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -434,7 +475,7 @@ fun MascotMessage(message: String) {
                 .background(Color.White.copy(alpha = 0.9f), RoundedCornerShape(12.dp))
                 .padding(8.dp)
         ) {
-            Text(message, fontSize = 11.sp, textAlign = TextAlign.Center, lineHeight = 14.sp)
+            Text(message, fontSize = 11.sp, textAlign = TextAlign.Center, lineHeight = 14.sp, fontWeight = FontWeight.Bold)
         }
         Spacer(modifier = Modifier.height(12.dp))
         Image(
@@ -457,7 +498,7 @@ fun PlantThumbnail(emotionEmoji: String, onClick: () -> Unit = {}) {
         Text(
             text = emotionEmoji,
             fontSize = 16.sp,
-            modifier = Modifier.offset(y = (-29).dp)
+            modifier = Modifier.offset(y = (-30).dp)
         )
     }
 }
@@ -503,7 +544,7 @@ fun HealthyFlower(emotion: String, onPositioned: (Offset) -> Unit, showFireworks
             Text(
                 text = emotion,
                 fontSize = 42.sp,
-                modifier = Modifier.offset(x = (-3).dp, y = (-80).dp)
+                modifier = Modifier.offset(x = (-3).dp, y = (-83).dp)
             )
         }
 
@@ -558,9 +599,10 @@ fun SeedTray(emotions: List<EmotionResponse>, onDrop: (EmotionResponse) -> Unit)
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(130.dp)
-            .background(Color.Black.copy(alpha = 0.2f), RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-            .padding(vertical = 10.dp, horizontal = 16.dp)
+            .height(160.dp)
+            .background(Color.Black.copy(alpha = 0.2f), RoundedCornerShape(24.dp))
+            .border(2.dp, Color.White.copy(alpha = 0.6f), RoundedCornerShape(24.dp))
+            .padding(top = 12.dp, bottom = 12.dp, start = 16.dp, end = 16.dp)
     ) {
         if (emotions.isNotEmpty()) {
             val chunkedEmotions = emotions.chunked(maxOf(1, (emotions.size + 1) / 2))
@@ -568,7 +610,7 @@ fun SeedTray(emotions: List<EmotionResponse>, onDrop: (EmotionResponse) -> Unit)
                 modifier = Modifier
                     .fillMaxWidth()
                     .horizontalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(4.dp) // Reduced spacing between rows
             ) {
                 chunkedEmotions.forEach { rowEmotions ->
                     Row(
@@ -583,9 +625,10 @@ fun SeedTray(emotions: List<EmotionResponse>, onDrop: (EmotionResponse) -> Unit)
                                 DraggableItem(
                                     emoji = emotion.emoji ?: "🌱",
                                     isFromSide = false,
+                                    hideOnDrag = true,
                                     onDrop = { onDrop(emotion) }
                                 )
-                                Spacer(modifier = Modifier.height(2.dp))
+                                // Removed Spacer to decrease gap between icon and name
                                 Text(
                                     text = emotion.name,
                                     fontSize = 10.sp,

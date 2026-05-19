@@ -56,7 +56,6 @@ fun ReviewScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = 80.dp)
         ) {
             // A. Header Card
             HeaderCard(onHelpClick = { viewModel.openHelpSheet() })
@@ -112,14 +111,6 @@ fun ReviewScreen(
             // D. Footer Card
             FooterSection(onNavigateToKnowledgeShelf = { onNavigateToKnowledgeShelf(null) })
         }
-
-        // Bottom Navigation Bar
-        SharedBottomNavBar(
-            modifier = Modifier.align(Alignment.BottomCenter),
-            currentTab = "emotion",
-            onEmotionClick = {},
-            onShelfClick = { onNavigateToKnowledgeShelf(null) }
-        )
 
         // Overlay Components
         EmotionColorBottomSheet(

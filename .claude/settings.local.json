@@ -36,7 +36,11 @@
       "Bash(Select-Object -First 60)",
       "PowerShell(.\\\\gradlew.bat :app:compileDebugKotlin)",
       "PowerShell(adb logcat *)",
-      "PowerShell(& \"C:\\\\Users\\\\Manh\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe\" logcat -d -s ShelfMatch)"
+      "PowerShell(& \"C:\\\\Users\\\\Manh\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe\" logcat -d -s ShelfMatch)",
+      "Bash(./gradlew :app:compileDebugKotlin)",
+      "PowerShell(Select-String -Path \".gitignore\",\"app\\\\src\\\\main\\\\java\\\\com\\\\example\\\\emogrow\\\\MainActivity.kt\",\"app\\\\src\\\\main\\\\java\\\\com\\\\example\\\\emogrow\\\\data\\\\remote\\\\api\\\\RetrofitInstance.kt\",\"app\\\\src\\\\main\\\\java\\\\com\\\\example\\\\emogrow\\\\features\\\\review\\\\ui\\\\ReviewScreen.kt\" -Pattern \"^<<<<<<\" | ForEach-Object { $_.Path + \":\" + $_.LineNumber })",
+      "Skill(gsd-review)",
+      "Skill(gsd-review:*)"
     ]
   }
 }

@@ -1,6 +1,8 @@
 package com.example.emogrow.features.review.ui
 
+import android.os.Build
 import android.util.Log
+import androidx.annotation.RequiresApi
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -94,7 +96,6 @@ fun KnowledgeShelfScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = 80.dp)
         ) {
             // A. Header Card
             ShelfHeader(
@@ -148,14 +149,6 @@ fun KnowledgeShelfScreen(
             onTeddyClick = { viewModel.toggleTeddyBubble() },
             onDismissBubble = { viewModel.closeTeddyBubble() },
             onBookClick = { book -> viewModel.openBookDialog(book) }
-        )
-
-        // Bottom Navigation Bar
-        SharedBottomNavBar(
-            modifier = Modifier.align(Alignment.BottomCenter),
-            currentTab = "shelf",
-            onEmotionClick = onBack,
-            onShelfClick = {}
         )
 
         // Book Detail Dialog
@@ -382,9 +375,11 @@ private fun BookShelfItem(
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.O)
 private val shelfDateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
 private const val TAG = "ShelfMatch"
 
+@RequiresApi(Build.VERSION_CODES.O)
 private fun shelfMatchesDate(shelfDate: String, highlightedDate: String): Boolean {
     val datePart = shelfDate.substringAfter(" - ", shelfDate.takeLast(10))
     Log.d(TAG, "shelfDate=$shelfDate | datePart=$datePart | highlightedDate=$highlightedDate")

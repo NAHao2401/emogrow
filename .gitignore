@@ -38,4 +38,5 @@ Thumbs.db
 # Secrets
 secret.properties
 keystore.properties
+AGENTS.md
 /GEMINI.md

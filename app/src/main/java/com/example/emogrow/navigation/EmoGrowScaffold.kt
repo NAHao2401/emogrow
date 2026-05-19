@@ -123,7 +123,9 @@ fun EmoGrowScaffold(
             if (showBottomBar) {
                 NavigationBar {
                     navItems.forEach { item ->
-                        val selected = routeForBottomSelection in item.selectedRoutes
+                        val selected = item.selectedRoutes.any { route ->
+                            routeForBottomSelection == route || routeForBottomSelection?.startsWith(route.substringBefore("{")) == true
+                        }
 
                         NavigationBarItem(
                             selected = selected,

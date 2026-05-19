@@ -10,6 +10,7 @@ import com.example.emogrow.data.remote.api.RetrofitInstance
 import com.example.emogrow.data.repository.AuthRepository
 import com.example.emogrow.data.repository.ChildRepository
 import com.example.emogrow.data.repository.EmotionRepository
+import com.example.emogrow.data.repository.ReviewRepository
 import com.example.emogrow.features.auth.viewmodel.AuthViewModelFactory
 import com.example.emogrow.features.children.viewmodel.ChildViewModelFactory
 import com.example.emogrow.features.emotions.viewmodel.EmotionViewModelFactory
@@ -27,17 +28,22 @@ class MainActivity : ComponentActivity() {
 
         val authRepository = AuthRepository(
             authApi = RetrofitInstance.authApi,
-            tokenManager = tokenManager
+            tokenManager = tokenManager,
         )
 
         val childRepository = ChildRepository(
             childApi = RetrofitInstance.childApi,
-            tokenManager = tokenManager
+            tokenManager = tokenManager,
         )
 
         val emotionRepository = EmotionRepository(
             emotionApi = RetrofitInstance.emotionApi,
-            tokenManager = tokenManager
+            tokenManager = tokenManager,
+        )
+
+        val reviewRepository = ReviewRepository(
+            reviewApi = RetrofitInstance.reviewApi,
+            tokenManager = tokenManager,
         )
 
         val journalRepository = JournalRepository(
@@ -56,6 +62,7 @@ class MainActivity : ComponentActivity() {
                     authFactory = authFactory,
                     childFactory = childFactory,
                     emotionFactory = emotionFactory,
+                    reviewRepository = reviewRepository,
                     journalFactory = journalFactory
                 )
             }

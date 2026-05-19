@@ -2,6 +2,8 @@ package com.example.emogrow.navigation
 
 import android.os.Build
 import androidx.annotation.RequiresApi
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -10,16 +12,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.runtime.remember
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import androidx.navigation.NavType
-import androidx.compose.runtime.rememberCoroutineScope
+import com.example.emogrow.data.repository.AlbumManager
+import com.example.emogrow.data.repository.ReviewRepository
 import com.example.emogrow.features.auth.ui.LoginScreen
 import com.example.emogrow.features.auth.ui.RegisterScreen
 import com.example.emogrow.features.auth.viewmodel.AuthViewModel
@@ -35,19 +40,19 @@ import com.example.emogrow.features.emotions.ui.EmotionListScreen
 import com.example.emogrow.features.emotions.viewmodel.EmotionViewModel
 import com.example.emogrow.features.emotions.viewmodel.EmotionViewModelFactory
 import com.example.emogrow.features.game.ui.GameScreen
+import com.example.emogrow.features.game.ui.GameViewModel
+import com.example.emogrow.features.game.ui.MenuGameScreen
 import com.example.emogrow.features.home.ui.HomeScreen
 import com.example.emogrow.features.journal.ui.JournalScreen
-import com.example.emogrow.features.profile.ui.UserProfileScreen
-import com.example.emogrow.features.review.ui.ReviewScreen
-import com.example.emogrow.features.game.ui.MenuGameScreen
-import com.example.emogrow.features.game.ui.GameViewModel
-import com.example.emogrow.data.repository.AlbumManager
-import kotlinx.coroutines.launch
-import kotlin.random.Random
-
 import com.example.emogrow.features.journal.viewmodel.JournalViewModel
 import com.example.emogrow.features.journal.viewmodel.JournalViewModelFactory
-
+import com.example.emogrow.features.profile.ui.UserProfileScreen
+import com.example.emogrow.features.review.ui.KnowledgeShelfScreen
+import com.example.emogrow.features.review.ui.ReviewScreen
+import com.example.emogrow.features.review.viewmodel.ReviewSharedViewModel
+import com.example.emogrow.features.review.viewmodel.ReviewSharedViewModelFactory
+import kotlinx.coroutines.launch
+import kotlin.random.Random
 
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
@@ -55,8 +60,8 @@ fun AppNavGraph(
     authFactory: AuthViewModelFactory,
     childFactory: ChildViewModelFactory,
     emotionFactory: EmotionViewModelFactory,
+    reviewRepository: ReviewRepository,
     journalFactory: JournalViewModelFactory
-
 ) {
     val navController = rememberNavController()
     val albumManager = remember { AlbumManager.getInstance(navController.context) }
@@ -309,23 +314,106 @@ fun AppNavGraph(
             }
         }
 
-        composable(Screen.Review.route) { backStackEntry ->
-            val childId = backStackEntry.arguments
-                ?.getString("childId")
-                ?.toIntOrNull() ?: return@composable
+        navigation(
+            route = Screen.ReviewGraph.route,
+            startDestination = Screen.Review.route
+        ) {
+            composable(
+                route = Screen.Review.route,
+                enterTransition = { fadeIn(animationSpec = tween(300)) },
+                exitTransition = { fadeOut(animationSpec = tween(300)) }
+            ) { backStackEntry ->
+                val childId = backStackEntry.arguments
+                    ?.getString("childId")
+                    ?.toInt() ?: 0
 
-            EmoGrowScaffold(
-                navController = navController,
-                childId = childId,
-                title = "Review"
-            ) { paddingValues ->
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues)
-                ) {
-                    ReviewScreen(childId = childId)
+                val parentEntry = remember(backStackEntry) {
+                    navController.getBackStackEntry(Screen.ReviewGraph.route)
                 }
+                val sharedViewModel: ReviewSharedViewModel = viewModel(
+                    viewModelStoreOwner = parentEntry,
+                    factory = ReviewSharedViewModelFactory(childId, reviewRepository)
+                )
+
+                EmoGrowScaffold(
+                    navController = navController,
+                    childId = childId,
+                    title = "Review"
+                ) { paddingValues ->
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(paddingValues)
+                    ) {
+                        ReviewScreen(
+                            viewModel = sharedViewModel,
+                            onNavigateToKnowledgeShelf = { date ->
+                                navController.navigate(Screen.KnowledgeShelf.createRoute(childId, date = date)) {
+                                    launchSingleTop = true
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+
+            composable(
+                route = Screen.KnowledgeShelf.route,
+                arguments = listOf(
+                    navArgument("childId") { type = NavType.IntType },
+                    navArgument("emotionId") { type = NavType.StringType; nullable = true; defaultValue = null },
+                    navArgument("date") { type = NavType.StringType; nullable = true; defaultValue = null }
+                ),
+                enterTransition = {
+                    slideInHorizontally(
+                        initialOffsetX = { it },
+                        animationSpec = tween(300)
+                    ) + fadeIn(animationSpec = tween(300))
+                },
+                exitTransition = {
+                    slideOutHorizontally(
+                        targetOffsetX = { it },
+                        animationSpec = tween(300)
+                    ) + fadeOut(animationSpec = tween(300))
+                }
+            ) { backStackEntry ->
+                val childId = backStackEntry.arguments
+                    ?.getInt("childId")
+                    ?: 0
+                val emotionId = backStackEntry.arguments?.getString("emotionId")
+                val date = backStackEntry.arguments?.getString("date")?.let(android.net.Uri::decode)
+
+                val parentEntry = remember(backStackEntry) {
+                    navController.getBackStackEntry(Screen.ReviewGraph.route)
+                }
+                val sharedViewModel: ReviewSharedViewModel = viewModel(
+                    viewModelStoreOwner = parentEntry,
+                    factory = ReviewSharedViewModelFactory(childId, reviewRepository)
+                )
+
+                LaunchedEffect(emotionId, date) {
+                    when {
+                        date != null -> sharedViewModel.navigateToKnowledgeShelfWithDate(date)
+                        emotionId != null -> sharedViewModel.navigateToKnowledgeShelfWithFilter(emotionId)
+                    }
+                }
+
+                KnowledgeShelfScreen(
+                    viewModel = sharedViewModel,
+                    onBack = { navController.popBackStack() },
+                    onNavigateToEmotionJarWithHighlight = { emotionCategory ->
+                        val emotionId = when (emotionCategory) {
+                            "Giận dữ" -> "tuc-gian"
+                            "Vui vẻ" -> "vui-ve"
+                            "Buồn bã" -> "buon"
+                            "Bình thường" -> "binh-tinh"
+                            "Yêu thương" -> "yeu-thuong"
+                            else -> null
+                        }
+                        sharedViewModel.highlightBeadsByEmotion(emotionId)
+                        navController.popBackStack()
+                    }
+                )
             }
         }
 
@@ -455,13 +543,25 @@ fun AppNavGraph(
                 ?.getString("childId")
                 ?.toInt() ?: 0
 
-            JournalScreen(
+            EmoGrowScaffold(
+                navController = navController,
                 childId = childId,
-                viewModel = journalViewModel,
-                onBack = {
-                    navController.popBackStack()
+                title = "Journal"
+            ) { paddingValues ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues)
+                ) {
+                    JournalScreen(
+                        childId = childId,
+                        viewModel = journalViewModel,
+                        onBack = {
+                            navController.popBackStack()
+                        }
+                    )
                 }
-            )
+            }
         }
     }
 }

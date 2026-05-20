@@ -74,7 +74,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.emogrow.data.repository.EmotionLevel
@@ -99,6 +107,9 @@ fun MenuGameScreen(
 
     Surface(modifier = modifier.fillMaxSize(), color = GameDesign.screenBg) {
         Column(modifier = Modifier.fillMaxSize()) {
+            // Top bar placed outside the grid so its alignment matches other screens.
+            MenuGameTopBar(onBack = onBack)
+
             LazyVerticalGrid(
                 columns = GridCells.Fixed(3),
                 // Bỏ padding đầu màn hình để header bám sát status bar như yêu cầu.
@@ -109,9 +120,7 @@ fun MenuGameScreen(
                     .fillMaxWidth()
                     .weight(1f)
             ) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    MenuGameTopBar(onBack = onBack)
-                }
+                
 
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     ProgressHeader(completed = completedCount, total = uiState.total)
@@ -159,41 +168,41 @@ fun MenuGameScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MenuGameTopBar(onBack: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .statusBarsPadding()
-            .padding(top = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(androidx.compose.foundation.shape.CircleShape)
-                .background(GameDesign.cardBg)
-                .clickable { onBack() },
-            contentAlignment = Alignment.Center
-        ) {
+    TopAppBar(
+        title = {
             Text(
-                text = "←",
-                style = MaterialTheme.typography.titleLarge.copy(
+                text = "Menu Game",
+                modifier = Modifier.padding(start = 12.dp),
+                style = MaterialTheme.typography.headlineSmall.copy(
                     fontWeight = FontWeight.Bold,
                     color = GameDesign.textDark
                 )
             )
+        },
+        navigationIcon = {
+            IconButton(
+                onClick = onBack,
+                modifier = Modifier
+                    .padding(start = 10.dp)
+                    .size(40.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                        shape = CircleShape
+                    )
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Quay lại",
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
+            }
         }
-
-        Text(
-            text = "Menu Game",
-            style = MaterialTheme.typography.headlineSmall.copy(
-                fontWeight = FontWeight.Bold,
-                color = GameDesign.textDark
-            )
-        )
-    }
+        ,
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = GameDesign.screenBg)
+    )
 }
 
 @Composable

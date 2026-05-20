@@ -40,3 +40,4 @@ secret.properties
 keystore.properties
 AGENTS.md
 /GEMINI.md
+*.md

@@ -165,7 +165,7 @@ fun GameScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(0.47f),
+                    .weight(0.42f),
                 contentAlignment = Alignment.Center
             ) {
                 Box(
@@ -218,7 +218,7 @@ fun GameScreen(
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(0.38f)
+                    .weight(0.4f)
             )
         }
 

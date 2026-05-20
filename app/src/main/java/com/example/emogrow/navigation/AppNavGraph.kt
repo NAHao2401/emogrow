@@ -604,22 +604,40 @@ fun AppNavGraph(
                 val childId = backStackEntry.arguments?.getInt("childId") ?: 0
                 val levelId = backStackEntry.arguments?.getInt("levelId") ?: 1
                 val gameViewModel: GameViewModel = viewModel()
-                GameScreen(
-                    viewModel = gameViewModel,
-                    levelId = levelId,
-                    onFaceCompleted = { _, _ ->
-                        // Teammate se xu ly celebration va flow round.
-                    },
-                    onLevelCompleted = { completedLevelId ->
-                        scope.launch {
-                            albumManager.completeLevel(childId, completedLevelId)
-                            navController.popBackStack()
-                        }
-                    },
-                    onExit = {
-                        navController.popBackStack()
+
+                EmoGrowScaffold(
+                    navController = navController,
+                    childId = childId,
+                    title = "Game",
+                    showTopBar = false,
+                    showBottomBar = true,
+                    onLogout = {
+                        authViewModel.logout()
                     }
-                )
+                ) { paddingValues ->
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(paddingValues)
+                    ) {
+                        GameScreen(
+                            viewModel = gameViewModel,
+                            levelId = levelId,
+                            onFaceCompleted = { _, _ ->
+                                // Teammate se xu ly celebration va flow round.
+                            },
+                            onLevelCompleted = { completedLevelId ->
+                                scope.launch {
+                                    albumManager.completeLevel(childId, completedLevelId)
+                                    navController.popBackStack()
+                                }
+                            },
+                            onExit = {
+                                navController.popBackStack()
+                            }
+                        )
+                    }
+                }
             }
 
             composable(Screen.Journal.route) { backStackEntry ->

@@ -2,6 +2,7 @@ package com.example.emogrow.data.repository
 
 import com.example.emogrow.data.local.TokenManager
 import com.example.emogrow.data.remote.api.AuthApi
+import com.example.emogrow.data.remote.dto.ChangePasswordRequest
 import com.example.emogrow.data.remote.dto.LoginRequest
 import com.example.emogrow.data.remote.dto.RegisterRequest
 import com.example.emogrow.data.remote.dto.UserResponse
@@ -60,6 +61,19 @@ class AuthRepository(
             tokenManager.clearToken()
             false
         }
+    }
+
+    suspend fun changePassword(
+        currentPassword: String,
+        newPassword: String
+    ) {
+        authApi.changePassword(
+            token = getBearerToken(),
+            request = ChangePasswordRequest(
+                current_password = currentPassword,
+                new_password = newPassword
+            )
+        )
     }
 
     suspend fun logout() {

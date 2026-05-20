@@ -103,6 +103,90 @@ class AuthViewModel(
         }
     }
 
+    fun changePassword(
+        currentPassword: String,
+        newPassword: String,
+        confirmPassword: String
+    ) {
+        if (currentPassword.isBlank() || newPassword.isBlank() || confirmPassword.isBlank()) {
+            _uiState.update {
+                it.copy(
+                    errorMessage = "Vui lòng nhập đầy đủ thông tin",
+                    successMessage = null,
+                    isChangePasswordSuccess = false
+                )
+            }
+            return
+        }
+
+        if (newPassword.length < 6) {
+            _uiState.update {
+                it.copy(
+                    errorMessage = "Mật khẩu mới phải có ít nhất 6 ký tự",
+                    successMessage = null,
+                    isChangePasswordSuccess = false
+                )
+            }
+            return
+        }
+
+        if (newPassword != confirmPassword) {
+            _uiState.update {
+                it.copy(
+                    errorMessage = "Mật khẩu xác nhận không khớp",
+                    successMessage = null,
+                    isChangePasswordSuccess = false
+                )
+            }
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isLoading = true,
+                    errorMessage = null,
+                    successMessage = null,
+                    isChangePasswordSuccess = false
+                )
+            }
+
+            try {
+                repository.changePassword(
+                    currentPassword = currentPassword,
+                    newPassword = newPassword
+                )
+
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        isChangePasswordSuccess = true,
+                        successMessage = "Đổi mật khẩu thành công"
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        errorMessage = ApiErrorParser.parse(e),
+                        successMessage = null,
+                        isChangePasswordSuccess = false
+                    )
+                }
+            }
+        }
+    }
+
+    fun resetChangePasswordState() {
+        _uiState.update {
+            it.copy(
+                isChangePasswordSuccess = false,
+                errorMessage = null,
+                successMessage = null
+            )
+        }
+    }
+
     fun logout() {
         viewModelScope.launch {
             repository.logout()
@@ -120,7 +204,9 @@ class AuthViewModel(
                 isLoginSuccess = false,
                 isRegisterSuccess = false,
                 isLoggedOut = false,
-                errorMessage = null
+                isChangePasswordSuccess = false,
+                errorMessage = null,
+                successMessage = null
             )
         }
     }

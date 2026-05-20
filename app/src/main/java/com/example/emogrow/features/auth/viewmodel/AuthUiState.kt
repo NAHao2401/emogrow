@@ -11,5 +11,7 @@ data class AuthUiState(
     val isRegisterSuccess: Boolean = false,
     val isLoggedOut: Boolean = false,
     val currentUser: UserResponse? = null,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val isChangePasswordSuccess: Boolean = false,
+    val successMessage: String? = null,
 )

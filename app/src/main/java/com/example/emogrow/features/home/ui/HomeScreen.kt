@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.emogrow.features.children.viewmodel.ChildViewModel
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -103,7 +104,6 @@ fun HomeScreen(
                         title = "Học cảm xúc",
                         description = "Khám phá cảm xúc qua thẻ học sinh động",
                         emoji = "😊",
-                        badge = "Lesson",
                         colors = listOf(Color(0xFFAEC3FF), Color(0xFFD8E2FF)),
                         onClick = onNavigateToLesson
                     )
@@ -139,7 +139,6 @@ fun HomeScreen(
                         title = "Xem lại hành trình",
                         description = "Theo dõi quá trình học và cảm xúc của bé",
                         emoji = "📚",
-                        badge = "Review",
                         colors = listOf(Color(0xFFD6C4FF), Color(0xFFF0E8FF)),
                         onClick = onNavigateToReview
                     )
@@ -276,7 +275,6 @@ private fun HomeFeatureCard(
     title: String,
     description: String,
     emoji: String,
-    badge: String,
     colors: List<Color>,
     onClick: () -> Unit
 ) {
@@ -319,19 +317,6 @@ private fun HomeFeatureCard(
                 Column(
                     modifier = Modifier.weight(1f)
                 ) {
-                    Surface(
-                        shape = RoundedCornerShape(50),
-                        color = Color.White.copy(alpha = 0.45f)
-                    ) {
-                        Text(
-                            text = badge,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF3F4464)
-                        )
-                    }
-
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
@@ -381,45 +366,61 @@ private fun SmallHomeFeatureCard(
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Brush.linearGradient(colors))
-                .padding(16.dp)
+        Row(
+            modifier = Modifier.fillMaxSize(),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(
-                modifier = Modifier.fillMaxSize()
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Brush.linearGradient(colors))
+                    .padding(16.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.55f)),
-                    contentAlignment = Alignment.Center
+                Column(
+                    modifier = Modifier.fillMaxSize()
                 ) {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.55f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = emoji,
+                            style = MaterialTheme.typography.titleLarge
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.weight(1f))
+
                     Text(
-                        text = emoji,
-                        style = MaterialTheme.typography.titleLarge
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontSize = 23.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF26304F)
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFF3F4663),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
 
-                Spacer(modifier = Modifier.weight(1f))
-
                 Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
+                    text = "›",
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(end = 4.dp),
+                    style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF26304F)
-                )
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFF3F4663),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+                    color = Color(0xFF26304F).copy(alpha = 0.75f)
                 )
             }
         }

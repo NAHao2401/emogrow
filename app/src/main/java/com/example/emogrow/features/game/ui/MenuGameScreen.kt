@@ -500,12 +500,12 @@ private fun EmotionLevelTile(
                             Text(
                                 text = level.emoji.ifBlank { "😊" },
                                 style = MaterialTheme.typography.displaySmall.copy(
-                                    fontSize = 36.sp,
+                                    fontSize = 45.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = GameDesign.white
                                 ),
                                 textAlign = TextAlign.Center,
-                                modifier = Modifier.size(52.dp)
+                                modifier = Modifier.size(62.dp)
                             )
                         }
 

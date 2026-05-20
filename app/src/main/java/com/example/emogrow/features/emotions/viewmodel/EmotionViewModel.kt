@@ -4,12 +4,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.emogrow.data.remote.ApiErrorParser
 import com.example.emogrow.data.repository.EmotionRepository
+import com.example.emogrow.data.repository.ReviewRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 class EmotionViewModel(
-    private val repository: EmotionRepository
+    private val repository: EmotionRepository,
+    private val reviewRepository: ReviewRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(EmotionUiState())
@@ -196,6 +198,21 @@ class EmotionViewModel(
         viewModelScope.launch {
             try {
                 val progress = repository.completeFlashcard(childId, flashcardId)
+
+                // Log emotion to Review system when a flashcard is completed
+                _uiState.value.selectedEmotion?.let { emotion ->
+                    try {
+                        reviewRepository.createEmotionLog(
+                            childId = childId,
+                            emotionType = emotion.name, // or some mapping to emotionId
+                            intensity = 5, // Lessons give max intensity "learning"
+                            note = "Hoàn thành bài học: ${_uiState.value.selectedFlashcard?.title}",
+                            source = "lesson"
+                        )
+                    } catch (e: Exception) {
+                        // Silent fail for logging if learning complete succeeded
+                    }
+                }
 
                 _uiState.value = _uiState.value.copy(
                     selectedProgress = progress,

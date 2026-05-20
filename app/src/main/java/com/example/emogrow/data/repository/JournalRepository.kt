@@ -23,7 +23,8 @@ class JournalRepository(
         plantState: String = "flower",
         feelingNote: String? = null,
         seedColor: String? = null,
-        voiceUrl: String? = null
+        voiceUrl: String? = null,
+        intensity: Int = 3
     ): DiaryResponse {
         return journalApi.createDiary(
             token = getBearerToken(),
@@ -34,7 +35,8 @@ class JournalRepository(
                 seed_color = seedColor,
                 plant_state = plantState,
                 feeling_note = feelingNote,
-                voice_url = voiceUrl
+                voice_url = voiceUrl,
+                intensity = intensity
             )
         )
     }

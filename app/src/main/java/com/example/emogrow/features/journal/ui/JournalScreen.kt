@@ -397,6 +397,11 @@ fun JournalScreen(
 
                             if (uiState.phase == JournalPhase.HEALTHY) {
                                 if (!uiState.isRecording) {
+                                    IntensitySelector(
+                                        currentIntensity = uiState.intensity,
+                                        onIntensityChange = { viewModel.onIntensityChanged(it) }
+                                    )
+                                    Spacer(modifier = Modifier.height(16.dp))
                                     JournalRecordButton(
                                         onClick = {
                                             recordPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
@@ -530,6 +535,26 @@ fun RecordingStatus() {
         fontSize = 14.sp,
         modifier = Modifier.background(Color.White.copy(alpha = 0.7f), RoundedCornerShape(4.dp)).padding(4.dp)
     )
+}
+
+@Composable
+fun IntensitySelector(currentIntensity: Int, onIntensityChange: (Int) -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text("Mức độ", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
+        Row {
+            repeat(5) { index ->
+                val level = index + 1
+                Text(
+                    text = "⭐",
+                    fontSize = 20.sp,
+                    modifier = Modifier
+                        .clickable { onIntensityChange(level) }
+                        .alpha(if (level <= currentIntensity) 1f else 0.3f)
+                        .padding(2.dp)
+                )
+            }
+        }
+    }
 }
 
 @Composable

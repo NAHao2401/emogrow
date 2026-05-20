@@ -36,4 +36,38 @@ class ReviewRepository(
             childId = childId
         )
     }
+
+    suspend fun createEmotionLog(
+        childId: Int,
+        emotionType: String,
+        intensity: Int,
+        note: String? = null,
+        source: String = "journal"
+    ): EmotionLogResponse {
+        return reviewApi.createEmotionLog(
+            token = getBearerToken(),
+            childId = childId,
+            request = com.example.emogrow.data.remote.dto.review.EmotionLogRequest(
+                emotion_type = emotionType,
+                intensity = intensity,
+                note = note,
+                source = source
+            )
+        )
+    }
+
+    suspend fun markBookAsRead(childId: Int, bookId: String) {
+        reviewApi.markBookAsRead(
+            token = getBearerToken(),
+            childId = childId,
+            bookId = bookId
+        )
+    }
+
+    suspend fun getReviewProgress(childId: Int): com.example.emogrow.data.remote.dto.review.ReviewProgressResponse {
+        return reviewApi.getReviewProgress(
+            token = getBearerToken(),
+            childId = childId
+        )
+    }
 }

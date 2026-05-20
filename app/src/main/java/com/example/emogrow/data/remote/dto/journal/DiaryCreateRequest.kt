@@ -6,5 +6,6 @@ data class DiaryCreateRequest(
     val seed_color: String?,
     val plant_state: String,
     val feeling_note: String?,
-    val voice_url: String?
+    val voice_url: String?,
+    val intensity: Int? = 3
 )

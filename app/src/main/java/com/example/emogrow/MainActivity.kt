@@ -53,7 +53,7 @@ class MainActivity : ComponentActivity() {
 
         val authFactory = AuthViewModelFactory(authRepository)
         val childFactory = ChildViewModelFactory(childRepository)
-        val emotionFactory = EmotionViewModelFactory(emotionRepository)
+        val emotionFactory = EmotionViewModelFactory(emotionRepository, reviewRepository)
         val journalFactory = JournalViewModelFactory(journalRepository)
 
         setContent {

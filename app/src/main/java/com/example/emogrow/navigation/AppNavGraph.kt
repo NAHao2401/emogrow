@@ -366,7 +366,7 @@ fun AppNavGraph(
                     ?.getString("childId")
                     ?.toInt() ?: 0
 
-                val parentEntry = remember(backStackEntry) {
+                val parentEntry = remember {
                     navController.getBackStackEntry(Screen.ReviewGraph.route)
                 }
                 val sharedViewModel: ReviewSharedViewModel = viewModel(
@@ -432,7 +432,7 @@ fun AppNavGraph(
                 val emotionId = backStackEntry.arguments?.getString("emotionId")
                 val date = backStackEntry.arguments?.getString("date")?.let(android.net.Uri::decode)
 
-                val parentEntry = remember(backStackEntry) {
+                val parentEntry = remember {
                     navController.getBackStackEntry(Screen.ReviewGraph.route)
                 }
                 val sharedViewModel: ReviewSharedViewModel = viewModel(

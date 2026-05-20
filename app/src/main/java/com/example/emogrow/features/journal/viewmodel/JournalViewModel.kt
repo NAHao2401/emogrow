@@ -29,6 +29,7 @@ data class JournalUiState(
     val pastJournals: List<DiaryResponse> = emptyList(),
     val selectedDateMillis: Long = System.currentTimeMillis(),
     val availableEmotions: List<EmotionResponse> = emptyList(),
+    val intensity: Int = 3,
     val isLoading: Boolean = false,
     val error: String? = null
 )
@@ -84,6 +85,10 @@ class JournalViewModel(
         }
     }
 
+    fun onIntensityChanged(intensity: Int) {
+        _uiState.update { it.copy(intensity = intensity) }
+    }
+
     fun setRecordingState(isRecording: Boolean) {
         _uiState.update { it.copy(isRecording = isRecording) }
     }
@@ -107,7 +112,8 @@ class JournalViewModel(
                     diaryDate = diaryDate,
                     plantState = "flower",
                     seedColor = currentEmotion.color_code,
-                    voiceUrl = _uiState.value.recordedAudioPath
+                    voiceUrl = _uiState.value.recordedAudioPath,
+                    intensity = _uiState.value.intensity
                 )
                 
                 // Reload history

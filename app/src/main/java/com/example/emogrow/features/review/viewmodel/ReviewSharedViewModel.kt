@@ -58,6 +58,8 @@ private fun DiaryBead.toEmotionBead(): EmotionBead {
 }
 
 data class ReviewSharedUiState(
+    val isLoading: Boolean = false,
+    val errorMessage: String? = null,
     val categories: List<EmotionBubble> = emptyList(),
     val pastBeads: List<EmotionBead> = emptyList(),
     val diaries: List<EmotionDiary> = emptyList(),
@@ -93,6 +95,26 @@ private fun createEmotionBubble(entry: com.example.emogrow.features.review.model
     )
 }
 
+private fun List<com.example.emogrow.features.review.model.EmotionEntry>.findByIdOrName(value: String) =
+    value.normalizedEmotionKey().let { normalized ->
+        find {
+            it.emotionId.normalizedEmotionKey() == normalized ||
+                it.name.normalizedEmotionKey() == normalized
+        }
+    }
+
+private fun String.normalizedEmotionKey(): String =
+    trim()
+        .lowercase()
+        .replace("_", "-")
+        .replace(" ", "-")
+
+private fun String.toLocalDateOrNull(): LocalDate? {
+    val datePart = trim().take(10)
+    if (datePart.length < 10) return null
+    return runCatching { LocalDate.parse(datePart) }.getOrNull()
+}
+
 class ReviewSharedViewModel(
     private val childId: Int,
     private val repository: ReviewRepository
@@ -114,9 +136,26 @@ class ReviewSharedViewModel(
     private val debounceMs = 300L
 
     init {
-        loadReviewData(_uiState.value.currentViewDate)
+        loadReviewData(_uiState.value.currentViewDate, fallbackToLatestLogMonth = true)
+        loadReviewProgress()
         viewModelScope.launch {
             updateMascotMessage()
+        }
+    }
+
+    private fun loadReviewProgress() {
+        viewModelScope.launch {
+            try {
+                val progress = repository.getReviewProgress(childId)
+                _uiState.update { 
+                    it.copy(
+                        readBooks = progress.read_book_ids.toSet(),
+                        unlockedStickers = (it.unlockedStickers + progress.unlocked_sticker_ids).toSet()
+                    )
+                }
+            } catch (e: Exception) {
+                // Fallback to initial stickers if API fails
+            }
         }
     }
 
@@ -125,33 +164,54 @@ class ReviewSharedViewModel(
         return date.year == today.year && date.monthValue == today.monthValue
     }
 
-    private fun loadReviewData(viewDate: LocalDate) {
+    private fun loadReviewData(
+        viewDate: LocalDate,
+        fallbackToLatestLogMonth: Boolean = false
+    ) {
+        if (_uiState.value.isLoading) return
         viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
             try {
                 val stats = repository.getEmotionStatistics(childId)
+                println("DEBUG: STATS FROM BE: total=${stats.total_count}, dist size=${stats.distribution.size}")
                 val logs = repository.getEmotionLogs(childId)
+                println("DEBUG: RAW LOGS FROM BE size = ${logs.size}")
+                logs.forEach { println("DEBUG: Log type=${it.emotion_type}, date=${it.created_at}") }
+
+                val datedLogs = logs.mapNotNull { log ->
+                    log.created_at.toLocalDateOrNull()?.let { date -> log to date }
+                }
+                val targetDate =
+                    if (fallbackToLatestLogMonth && datedLogs.none { (_, date) ->
+                            date.year == viewDate.year && date.monthValue == viewDate.monthValue
+                        }
+                    ) {
+                        datedLogs.maxByOrNull { (_, date) -> date }?.second ?: viewDate
+                    } else {
+                        viewDate
+                    }
+
                 // Filter logs for the requested month
-                val monthLogs = logs.filter { log ->
-                    val logDate = LocalDate.parse(log.created_at.split("T")[0])
-                    logDate.year == viewDate.year && logDate.monthValue == viewDate.monthValue
+                val monthLogs = datedLogs.filter { (_, date) ->
+                    date.year == targetDate.year && date.monthValue == targetDate.monthValue
                 }
 
                 // Map logs to EmotionDiary
-                val diaries = monthLogs.map { log ->
-                    val dateStr = log.created_at.split("T")[0]
-                    val emotion = allEmotions.find { it.emotionId == log.emotion_type }
+                val diaries = monthLogs.map { (log, date) ->
+                    val dateStr = date.toString()
+                    val emotion = allEmotions.findByIdOrName(log.emotion_type)
                     EmotionDiary(
                         diaryId = log.emotion_log_id.toString(),
                         childId = childId,
-                        emotionId = log.emotion_type,
+                        emotionId = emotion?.emotionId ?: log.emotion_type,
                         diaryDate = dateStr,
                         seedColor = emotion?.colorCode ?: "#FFD54F",
-                        feelingNote = "Hôm nay con cảm thấy ${emotion?.name ?: log.emotion_type}."
+                        feelingNote = log.note ?: "Hôm nay con cảm thấy ${emotion?.name ?: log.emotion_type}."
                     )
                 }
 
                 val beads = diaries.map { diary ->
-                    val emotion = allEmotions.find { it.emotionId == diary.emotionId }
+                    val emotion = allEmotions.findByIdOrName(diary.emotionId)
                     EmotionBead(
                         id = diary.diaryId,
                         date = diary.diaryDate,
@@ -166,7 +226,11 @@ class ReviewSharedViewModel(
                 }
 
                 val bubbles = allEmotions.map { entry ->
-                    val stat = stats.distribution.find { it.emotion_type.toString() == entry.emotionId }
+                    val stat = stats.distribution.find { stat ->
+                        val emotionType = stat.emotion_type.normalizedEmotionKey()
+                        emotionType == entry.emotionId.normalizedEmotionKey() ||
+                            emotionType == entry.name.normalizedEmotionKey()
+                    }
                     val percentage = if (stats.total_count > 0) {
                         "${(stat?.count ?: 0) * 100 / stats.total_count}%"
                     } else "0%"
@@ -184,14 +248,22 @@ class ReviewSharedViewModel(
                 _shelves.value = createShelves(diaries)
                 _uiState.update {
                     it.copy(
+                        isLoading = false,
                         categories = bubbles,
                         pastBeads = beads,
-                        diaries = diaries
+                        diaries = diaries,
+                        currentViewDate = targetDate
                     )
                 }
                 updateMascotMessage()
             } catch (e: Exception) {
-                // Handle error
+                e.printStackTrace()
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        errorMessage = e.localizedMessage ?: "KhÃ´ng táº£i Ä‘Æ°á»£c dá»¯ liá»‡u review"
+                    )
+                }
             }
         }
     }
@@ -224,10 +296,27 @@ class ReviewSharedViewModel(
 
     private fun createShelves(diaries: List<EmotionDiary>): List<ShelfData> {
         val formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
-        return diaries.mapIndexed { index, diary ->
+        return diaries.map { diary ->
             val date = LocalDate.parse(diary.diaryDate)
-            val dayName = "Thứ ${date.dayOfWeek.value + 1}"
-            val books = (0 until 3).map { sampleBooks[(index + it) % sampleBooks.size] }
+            val dayName = when(date.dayOfWeek.value) {
+                1 -> "Thứ 2"
+                2 -> "Thứ 3"
+                3 -> "Thứ 4"
+                4 -> "Thứ 5"
+                5 -> "Thứ 6"
+                6 -> "Thứ 7"
+                else -> "Chủ Nhật"
+            }
+            
+            // Lấy sách dựa trên cảm xúc của ngày đó
+            val emotionBooks = getBooksByEmotion(diary.emotionId)
+            // Nếu không có sách đúng category, lấy sample ngẫu nhiên
+            val books = if (emotionBooks.isNotEmpty()) {
+                emotionBooks.take(3)
+            } else {
+                sampleBooks.shuffled().take(3)
+            }
+
             ShelfData(
                 date = "$dayName - ${date.format(formatter)}",
                 books = books
@@ -296,16 +385,23 @@ class ReviewSharedViewModel(
     }
 
     fun markBookAsRead(bookId: String) {
-        _uiState.update { state ->
-            val newReadBooks = state.readBooks + bookId
-            // Unlock stickers related to this book
-            val stickersToUnlock = allStickersList.filter { it.relatedBookId == bookId }
-            val newUnlockedStickers = state.unlockedStickers + stickersToUnlock.map { it.id }
+        viewModelScope.launch {
+            try {
+                repository.markBookAsRead(childId, bookId)
+                _uiState.update { state ->
+                    val newReadBooks = state.readBooks + bookId
+                    // Unlock stickers related to this book
+                    val stickersToUnlock = allStickersList.filter { it.relatedBookId == bookId }
+                    val newUnlockedStickers = state.unlockedStickers + stickersToUnlock.map { it.id }
 
-            state.copy(
-                readBooks = newReadBooks,
-                unlockedStickers = newUnlockedStickers
-            )
+                    state.copy(
+                        readBooks = newReadBooks,
+                        unlockedStickers = newUnlockedStickers
+                    )
+                }
+            } catch (e: Exception) {
+                // Optional: handle error
+            }
         }
     }
 

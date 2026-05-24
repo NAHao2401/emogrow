@@ -5,6 +5,10 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.annotation.RequiresApi
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.ui.Modifier
 import com.example.emogrow.data.local.TokenManager
 import com.example.emogrow.data.remote.api.RetrofitInstance
 import com.example.emogrow.data.repository.AuthRepository
@@ -24,47 +28,62 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val tokenManager = TokenManager(applicationContext)
+        val tokenManager by lazy { TokenManager(applicationContext) }
 
-        val authRepository = AuthRepository(
-            authApi = RetrofitInstance.authApi,
-            tokenManager = tokenManager,
-        )
+        val authRepository by lazy {
+            AuthRepository(
+                authApi = RetrofitInstance.authApi,
+                tokenManager = tokenManager,
+            )
+        }
 
-        val childRepository = ChildRepository(
-            childApi = RetrofitInstance.childApi,
-            tokenManager = tokenManager,
-        )
+        val childRepository by lazy {
+            ChildRepository(
+                childApi = RetrofitInstance.childApi,
+                tokenManager = tokenManager,
+            )
+        }
 
-        val emotionRepository = EmotionRepository(
-            emotionApi = RetrofitInstance.emotionApi,
-            tokenManager = tokenManager,
-        )
+        val emotionRepository by lazy {
+            EmotionRepository(
+                emotionApi = RetrofitInstance.emotionApi,
+                tokenManager = tokenManager,
+            )
+        }
 
-        val reviewRepository = ReviewRepository(
-            reviewApi = RetrofitInstance.reviewApi,
-            tokenManager = tokenManager,
-        )
+        val reviewRepository by lazy {
+            ReviewRepository(
+                reviewApi = RetrofitInstance.reviewApi,
+                tokenManager = tokenManager,
+            )
+        }
 
-        val journalRepository = JournalRepository(
-            journalApi = RetrofitInstance.journalApi,
-            tokenManager = tokenManager
-        )
+        val journalRepository by lazy {
+            JournalRepository(
+                journalApi = RetrofitInstance.journalApi,
+                tokenManager = tokenManager
+            )
+        }
 
-        val authFactory = AuthViewModelFactory(authRepository)
-        val childFactory = ChildViewModelFactory(childRepository)
-        val emotionFactory = EmotionViewModelFactory(emotionRepository, reviewRepository)
-        val journalFactory = JournalViewModelFactory(journalRepository)
+        val authFactory by lazy { AuthViewModelFactory(authRepository) }
+        val childFactory by lazy { ChildViewModelFactory(childRepository) }
+        val emotionFactory by lazy { EmotionViewModelFactory(emotionRepository, reviewRepository) }
+        val journalFactory by lazy { JournalViewModelFactory(journalRepository) }
 
         setContent {
             EmoGrowTheme {
-                AppNavGraph(
-                    authFactory = authFactory,
-                    childFactory = childFactory,
-                    emotionFactory = emotionFactory,
-                    reviewRepository = reviewRepository,
-                    journalFactory = journalFactory
-                )
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    AppNavGraph(
+                        authFactory = authFactory,
+                        childFactory = childFactory,
+                        emotionFactory = emotionFactory,
+                        reviewRepository = reviewRepository,
+                        journalFactory = journalFactory
+                    )
+                }
             }
         }
     }

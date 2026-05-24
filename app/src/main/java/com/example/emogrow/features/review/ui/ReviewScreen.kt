@@ -90,14 +90,29 @@ fun ReviewScreen(
                         .clipToBounds(),
                     contentAlignment = Alignment.Center
                 ) {
-                    EmotionJarPreview(
-                        beads = uiState.pastBeads,
-                        highlightedBeadId = uiState.highlightedBeadId,
-                        onBeadClick = { bead ->
-                            viewModel.highlightBead(bead.id)
-                            viewModel.openBeadDialog(bead)
-                        }
-                    )
+                    when {
+                        uiState.isLoading -> CircularProgressIndicator()
+                        uiState.errorMessage != null -> Text(
+                            text = uiState.errorMessage ?: "",
+                            color = MaterialTheme.colorScheme.error,
+                            fontSize = 14.sp,
+                            modifier = Modifier.padding(24.dp)
+                        )
+                        uiState.pastBeads.isEmpty() -> Text(
+                            text = "Chưa có dữ liệu cảm xúc cho tháng này",
+                            color = Color.DarkGray.copy(alpha = 0.8f),
+                            fontSize = 14.sp,
+                            modifier = Modifier.padding(24.dp)
+                        )
+                        else -> EmotionJarPreview(
+                            beads = uiState.pastBeads,
+                            highlightedBeadId = uiState.highlightedBeadId,
+                            onBeadClick = { bead ->
+                                viewModel.highlightBead(bead.id)
+                                viewModel.openBeadDialog(bead)
+                            }
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(4.dp))

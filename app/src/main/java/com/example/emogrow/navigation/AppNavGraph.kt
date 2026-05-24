@@ -1,21 +1,20 @@
 package com.example.emogrow.navigation
 
+import android.annotation.SuppressLint
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -54,6 +53,7 @@ import com.example.emogrow.features.review.viewmodel.ReviewSharedViewModelFactor
 import kotlinx.coroutines.launch
 import kotlin.random.Random
 
+@SuppressLint("UnrememberedGetBackStackEntry")
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun AppNavGraph(
@@ -111,10 +111,22 @@ fun AppNavGraph(
             }
 
             Box(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xFFFAF8FF)),
                 contentAlignment = Alignment.Center
             ) {
-                CircularProgressIndicator()
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "🌱",
+                        style = MaterialTheme.typography.displayMedium
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    CircularProgressIndicator(
+                        color = Color(0xFF5A6FAA),
+                        strokeWidth = 3.dp
+                    )
+                }
             }
         }
 
@@ -366,7 +378,7 @@ fun AppNavGraph(
                     ?.getString("childId")
                     ?.toInt() ?: 0
 
-                val parentEntry = remember(backStackEntry) {
+                val parentEntry = remember {
                     navController.getBackStackEntry(Screen.ReviewGraph.route)
                 }
                 val sharedViewModel: ReviewSharedViewModel = viewModel(
@@ -432,7 +444,7 @@ fun AppNavGraph(
                 val emotionId = backStackEntry.arguments?.getString("emotionId")
                 val date = backStackEntry.arguments?.getString("date")?.let(android.net.Uri::decode)
 
-                val parentEntry = remember(backStackEntry) {
+                val parentEntry = remember {
                     navController.getBackStackEntry(Screen.ReviewGraph.route)
                 }
                 val sharedViewModel: ReviewSharedViewModel = viewModel(

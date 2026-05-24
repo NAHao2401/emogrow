@@ -11,5 +11,6 @@ data class DiaryResponse(
     val plant_state: String,
     val feeling_note: String?,
     val voice_url: String?,
+    val intensity: Int?,
     val created_at: String
 )

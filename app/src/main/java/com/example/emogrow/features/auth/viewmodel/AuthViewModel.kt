@@ -24,13 +24,21 @@ class AuthViewModel(
                 hasCheckedAuth = false
             )
 
-            val isValidToken = repository.checkAutoLogin()
+            try {
+                val isValidToken = repository.checkAutoLogin()
 
-            _uiState.value = AuthUiState(
-                isCheckingAuth = false,
-                hasCheckedAuth = true,
-                isAuthenticated = isValidToken
-            )
+                _uiState.value = AuthUiState(
+                    isCheckingAuth = false,
+                    hasCheckedAuth = true,
+                    isAuthenticated = isValidToken
+                )
+            } catch (e: Exception) {
+                _uiState.value = AuthUiState(
+                    isCheckingAuth = false,
+                    hasCheckedAuth = true,
+                    isAuthenticated = false
+                )
+            }
         }
     }
 

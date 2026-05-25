@@ -1,8 +1,9 @@
-package com.example.emogrow.features.review.viewmodel
+﻿package com.example.emogrow.features.review.viewmodel
 
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.compose.ui.graphics.Color
+import androidx.core.graphics.toColorInt
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.emogrow.data.repository.ReviewRepository
@@ -91,7 +92,11 @@ private fun createEmotionBubble(entry: com.example.emogrow.features.review.model
         id = entry.emotionId,
         emoji = entry.emoji,
         percentage = "0%",
-        color = try { androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(entry.colorCode)) } catch (e: Exception) { Color(0xFFFFD54F) },
+        color = try {
+            Color(entry.colorCode.toColorInt())
+        } catch (e: Exception) {
+            Color(0xFFFFD54F)
+        },
         label = entry.name,
         description = entry.description
     )
@@ -225,7 +230,11 @@ class ReviewSharedViewModel(
                         displayDate = LocalDate.parse(diary.diaryDate).format(DateTimeFormatter.ofPattern("dd/MM/yyyy")),
                         emotionId = diary.emotionId,
                         emoji = emotion?.emoji ?: "😊",
-                        color = try { Color(android.graphics.Color.parseColor(diary.seedColor)) } catch (e: Exception) { Color(0xFFFFD54F) },
+                        color = try {
+                            Color(diary.seedColor.toColorInt())
+                        } catch (e: Exception) {
+                            Color(0xFFFFD54F)
+                        },
                         label = emotion?.name ?: "Unknown",
                         description = diary.feelingNote,
                         isToday = diary.diaryDate == LocalDate.now().toString()
@@ -303,32 +312,35 @@ class ReviewSharedViewModel(
 
     private fun createShelves(diaries: List<EmotionDiary>): List<ShelfData> {
         val formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
-        return diaries.map { diary ->
-            val date = LocalDate.parse(diary.diaryDate)
-            val dayName = when(date.dayOfWeek.value) {
-                1 -> "Thứ 2"
-                2 -> "Thứ 3"
-                3 -> "Thứ 4"
-                4 -> "Thứ 5"
-                5 -> "Thứ 6"
-                6 -> "Thứ 7"
-                else -> "Chủ Nhật"
-            }
+        return diaries
+            .groupBy { it.diaryDate }
+            .map { (diaryDate, diariesInDate) ->
+                val date = LocalDate.parse(diaryDate)
+                val dayName = when(date.dayOfWeek.value) {
+                    1 -> "Thứ 2"
+                    2 -> "Thứ 3"
+                    3 -> "Thứ 4"
+                    4 -> "Thứ 5"
+                    5 -> "Thứ 6"
+                    6 -> "Thứ 7"
+                    else -> "Chủ Nhật"
+                }
 
-            // Lấy sách dựa trên cảm xúc của ngày đó
-            val emotionBooks = getBooksByEmotion(diary.emotionId)
-            // Nếu không có sách đúng category, lấy sample ngẫu nhiên
-            val books = if (emotionBooks.isNotEmpty()) {
-                emotionBooks.take(3)
-            } else {
-                sampleBooks.shuffled().take(3)
-            }
+                val books = diariesInDate
+                    .flatMap { diary ->
+                        getBooksByEmotion(diary.emotionId).ifEmpty {
+                            sampleBooks.shuffled().take(3)
+                        }
+                    }
+                    .distinctBy { it.id }
+                    .take(6)
 
-            ShelfData(
-                date = "$dayName - ${date.format(formatter)}",
-                books = books
-            )
-        }
+                ShelfData(
+                    id = diaryDate,
+                    date = "$dayName - ${date.format(formatter)}",
+                    books = books
+                )
+            }
     }
 
     fun selectEmotion(emotionId: String) {
@@ -532,3 +544,5 @@ class ReviewSharedViewModelFactory(
         return ReviewSharedViewModel(childId, repository) as T
     }
 }
+
+

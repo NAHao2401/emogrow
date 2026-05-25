@@ -234,9 +234,7 @@ fun EmoGrowScaffold(
                             icon = {
                                 Text(item.emoji)
                             },
-                            label = {
-                                Text(item.title)
-                            }
+                            label = null
                         )
                     }
                 }

@@ -1,27 +1,57 @@
-package com.example.emogrow.features.review.ui.components
+﻿package com.example.emogrow.features.review.ui.components
 
-import androidx.compose.animation.*
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -81,10 +111,7 @@ fun BookDetailDialog(
                     colors = CardDefaults.cardColors(containerColor = Color.White),
                     elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
                 ) {
-                    Column(
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        // Header with book image
+                    Column(modifier = Modifier.fillMaxSize()) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -98,7 +125,6 @@ fun BookDetailDialog(
                                 contentScale = ContentScale.Crop
                             )
 
-                            // Close button
                             IconButton(
                                 onClick = onDismiss,
                                 modifier = Modifier
@@ -114,7 +140,6 @@ fun BookDetailDialog(
                                 )
                             }
 
-                            // Read badge
                             if (isRead) {
                                 Surface(
                                     modifier = Modifier
@@ -145,11 +170,12 @@ fun BookDetailDialog(
                             }
                         }
 
-                        // Content
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(20.dp)
+                                .weight(1f)
+                                .padding(horizontal = 20.dp, vertical = 12.dp)
+                                .verticalScroll(rememberScrollState())
                         ) {
                             Text(
                                 text = book.title,
@@ -157,130 +183,109 @@ fun BookDetailDialog(
                                 fontWeight = FontWeight.Bold,
                                 color = Color.DarkGray
                             )
-
                             Spacer(modifier = Modifier.height(4.dp))
-
                             Text(
                                 text = book.author,
                                 fontSize = 14.sp,
                                 color = Color.Gray
                             )
-
                             Spacer(modifier = Modifier.height(16.dp))
-
                             HorizontalDivider()
-
                             Spacer(modifier = Modifier.height(16.dp))
-
-                            // Book content placeholder
                             Text(
                                 text = "📖 Nội dung bài học",
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.DarkGray
                             )
-
                             Spacer(modifier = Modifier.height(8.dp))
-
                             Text(
                                 text = book.content,
                                 fontSize = 14.sp,
                                 color = Color.DarkGray,
                                 lineHeight = 22.sp
                             )
-
                             Spacer(modifier = Modifier.height(16.dp))
-
-                            // Additional content sections
                             Text(
                                 text = "💡 Bài học rút ra",
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.DarkGray
                             )
-
                             Spacer(modifier = Modifier.height(8.dp))
-
                             Text(
                                 text = "Qua câu chuyện này, chúng ta học được rằng ${book.title.lowercase()} là một phần quan trọng trong cuộc sống hàng ngày. Hãy ghi nhớ bài học này và áp dụng vào cuộc sống nhé!",
                                 fontSize = 14.sp,
                                 color = Color.DarkGray,
                                 lineHeight = 22.sp
                             )
+                        }
 
-                            Spacer(modifier = Modifier.weight(1f))
-
-                            // Action buttons
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(20.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = {
+                                    if (!isRead) onMarkAsRead()
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(48.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = if (isRead) Color(0xFF4CAF50) else DarkPurple
+                                ),
+                                enabled = !isRead
                             ) {
-                                // Mark as read button
-                                OutlinedButton(
-                                    onClick = {
-                                        if (!isRead) {
-                                            onMarkAsRead()
-                                        }
-                                    },
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(48.dp),
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = ButtonDefaults.outlinedButtonColors(
-                                        contentColor = if (isRead) Color(0xFF4CAF50) else DarkPurple
-                                    ),
-                                    enabled = !isRead
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Check,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = if (isRead) "Đã đánh dấu" else "Đánh dấu đã đọc",
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                }
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = if (isRead) "Đã đánh dấu" else "Đánh dấu đã đọc",
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
 
-                                // Add emotion note button
-                                Button(
-                                    onClick = onAddEmotionNote,
+                            Button(
+                                onClick = onAddEmotionNote,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(48.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                                contentPadding = PaddingValues()
+                            ) {
+                                Box(
                                     modifier = Modifier
-                                        .weight(1f)
-                                        .height(48.dp),
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = Color.Transparent
-                                    ),
-                                    contentPadding = PaddingValues()
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .background(
-                                                brush = Brush.horizontalGradient(
-                                                    colors = listOf(LightPurple, DarkPurple)
-                                                ),
-                                                shape = RoundedCornerShape(12.dp)
+                                        .fillMaxSize()
+                                        .background(
+                                            brush = Brush.horizontalGradient(
+                                                colors = listOf(LightPurple, DarkPurple)
                                             ),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(
-                                                imageVector = Icons.Default.Favorite,
-                                                contentDescription = null,
-                                                tint = GoldStar,
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Text(
-                                                text = "Ghi chú cảm xúc",
-                                                fontWeight = FontWeight.Bold,
-                                                color = Color.White,
-                                                fontSize = 14.sp
-                                            )
-                                        }
+                                            shape = RoundedCornerShape(12.dp)
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.Favorite,
+                                            contentDescription = null,
+                                            tint = GoldStar,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "Ghi chú cảm xúc",
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White,
+                                            fontSize = 14.sp
+                                        )
                                     }
                                 }
                             }

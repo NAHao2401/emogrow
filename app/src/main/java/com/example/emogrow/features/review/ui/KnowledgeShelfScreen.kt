@@ -58,6 +58,7 @@ import java.time.format.DateTimeFormatter
 
 import androidx.compose.runtime.LaunchedEffect
 
+@RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun KnowledgeShelfScreen(
     onBack: () -> Unit,
@@ -124,7 +125,7 @@ fun KnowledgeShelfScreen(
                     verticalArrangement = Arrangement.spacedBy(24.dp),
                     userScrollEnabled = true
                 ) {
-                    items(shelves, key = { it.date }) { shelf ->
+                    items(shelves, key = { it.id }) { shelf ->
                         BookShelfItem(
                             shelfData = shelf,
                             readBooks = uiState.readBooks,
@@ -282,6 +283,7 @@ private fun ShelfHeader(modifier: Modifier = Modifier, onBack: () -> Unit, onAlb
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.O)
 @Composable
 private fun BookShelfItem(
     shelfData: ShelfData,
@@ -344,7 +346,7 @@ private fun BookShelfItem(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.Bottom
             ) {
-                items(shelfData.books) { book ->
+                items(shelfData.books, key = { it.id }) { book ->
                     BookItem(
                         book = book,
                         isRead = readBooks.contains(book.id),
@@ -695,3 +697,5 @@ private fun TeddyMascot(
         }
     }
 }
+
+
